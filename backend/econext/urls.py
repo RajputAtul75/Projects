@@ -16,9 +16,27 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from products.views import welcome
+from shop_cart import api_views as cart_views
 
 urlpatterns = [
+    path('', welcome, name='welcome'),
     path('admin/', admin.site.urls),
+    
+    # API endpoints
+    path('api/', include('accounts.urls')),
     path('api/products/', include('products.urls')),
-
+    
+    # Cart endpoints
+    path('api/cart/', cart_views.get_cart, name='get_cart'),
+    path('api/cart/add/', cart_views.add_to_cart, name='add_to_cart'),
+    path('api/cart/item/<int:item_id>/', cart_views.update_cart_item, name='update_cart_item'),
+    path('api/cart/item/<int:item_id>/delete/', cart_views.remove_from_cart, name='remove_from_cart'),
+    path('api/cart/clear/', cart_views.clear_cart, name='clear_cart'),
+    
+    # Order endpoints
+    path('api/orders/create/', cart_views.create_order, name='create_order'),
+    path('api/orders/', cart_views.order_list, name='order_list'),
+    path('api/orders/<int:order_id>/', cart_views.order_detail, name='order_detail'),
+    path('api/orders/<int:order_id>/status/', cart_views.update_order_status, name='update_order_status'),
 ]
