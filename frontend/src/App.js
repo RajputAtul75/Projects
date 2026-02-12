@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import './styles.css';
+import './modern-styles.css';
 import './App.css';
 import { apiService } from './api';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
+import ProductDetailView from './ProductDetailView';
+import CheckoutPage from './CheckoutPage';
+import ProfilePage from './ProfilePage';
+import { 
+  AnimatedButton, 
+  ProductCard, 
+  HeroSection, 
+  Modal, 
+  Skeleton 
+} from './components';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, ChevronRight, Leaf } from 'lucide-react';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
@@ -11,9 +23,10 @@ function App() {
   const [searchResults, setSearchResults] = useState(null);
   const [cart, setCart] = useState([]);
   const [trendingProducts, setTrendingProducts] = useState([]);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [carouselIndex, setCarouselIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState(null);
-  const [visualSearchOn, setVisualSearchOn] = useState(false);
   const [user, setUser] = useState(null);
   const [authToken, setAuthToken] = useState(localStorage.getItem('authToken'));
 
@@ -23,6 +36,16 @@ function App() {
     loadTrendingProducts();
     checkUserSession();
   }, []);
+
+  // Auto-rotate carousel every 5 seconds
+  useEffect(() => {
+    if (featuredProducts.length > 0) {
+      const timer = setInterval(() => {
+        setCarouselIndex((prev) => (prev + 1) % featuredProducts.length);
+      }, 5000);
+      return () => clearInterval(timer);
+    }
+  }, [featuredProducts]);
 
   const checkUserSession = () => {
     const token = localStorage.getItem('authToken');
@@ -61,12 +84,18 @@ function App() {
   const loadProducts = async () => {
     setLoading(true);
     try {
-      const data = await apiService.getProducts();
+      const data = await apiService.getProducts(1, 50);
       if (data.status === 'success') {
         setProducts(data.products);
+        // Set featured products (randomly select 5)
+        const featured = data.products
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 5);
+        setFeaturedProducts(featured);
       }
     } catch (error) {
       console.error('Error loading products:', error);
+      showAlert('Failed to load products', 'error');
     }
     setLoading(false);
   };
@@ -101,29 +130,6 @@ function App() {
     setLoading(false);
   };
 
-  const handleVisualSearch = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setLoading(true);
-    try {
-      const data = await apiService.visualSearch(file);
-      if (data.status === 'success') {
-        setSearchResults({
-          'Visual Search Results': data.results.map(r => ({
-            product: r.product,
-            similarity_score: r.similarity_score,
-            intent_match: `Similarity: ${(r.similarity_score * 100).toFixed(1)}%`
-          }))
-        });
-        setCurrentPage('search');
-      }
-    } catch (error) {
-      showAlert('Visual search failed: ' + error.message, 'error');
-    }
-    setLoading(false);
-  };
-
   const handleAddToCart = (product) => {
     const existingItem = cart.find(item => item.id === product.id);
     
@@ -138,18 +144,6 @@ function App() {
     }
     
     showAlert(`${product.name} added to cart!`, 'success');
-  };
-
-  const handleCartQuantityChange = (productId, quantity) => {
-    if (quantity <= 0) {
-      setCart(cart.filter(item => item.id !== productId));
-    } else {
-      setCart(cart.map(item =>
-        item.id === productId
-          ? { ...item, quantity }
-          : item
-      ));
-    }
   };
 
   const handleRemoveFromCart = (productId) => {
@@ -170,14 +164,15 @@ function App() {
       <header>
         <nav>
           <div className="logo" onClick={() => setCurrentPage('home')} style={{cursor: 'pointer'}}>
-            🌿 EcoNext
+            <Leaf size={24} style={{display: 'inline-block', marginRight: '8px'}} />
+            EcoNext
           </div>
           
           <form className="search-bar" onSubmit={handleSearch}>
             <input
               type="text"
               className="search-input"
-              placeholder="🔍 Search products by intent..."
+              placeholder="Search eco-friendly products..."
             />
             <button type="submit">Search</button>
           </form>
@@ -185,18 +180,17 @@ function App() {
           <ul className="nav-menu">
             <li><a onClick={() => setCurrentPage('home')}>Home</a></li>
             <li><a onClick={() => setCurrentPage('trending')}>Trending</a></li>
-            <li><a onClick={() => setCurrentPage('visual')}>📸 Visual Search</a></li>
             <li><a onClick={() => setCurrentPage('cart')}>🛒 Cart ({cart.length})</a></li>
             
             {user ? (
               <>
                 <li><a onClick={() => setCurrentPage('profile')}>👤 {user.username}</a></li>
-                <li><a onClick={handleLogout} className="logout-btn">Logout</a></li>
+                <li><a onClick={handleLogout} style={{color: '#EF4444'}}>Logout</a></li>
               </>
             ) : (
               <>
-                <li><a onClick={() => setCurrentPage('login')} className="auth-btn">Login</a></li>
-                <li><a onClick={() => setCurrentPage('signup')} className="auth-btn">Sign up</a></li>
+                <li><a onClick={() => setCurrentPage('login')}>Login</a></li>
+                <li><a onClick={() => setCurrentPage('signup')}>Sign up</a></li>
               </>
             )}
           </ul>
@@ -205,17 +199,18 @@ function App() {
 
       {/* Alerts */}
       {alert && (
-        <div className={`container`}>
-          <div className={`alert alert-${alert.type}`}>
-            {alert.message}
-          </div>
-        </div>
+        <motion.div 
+          className={`alert alert-${alert.type}`}
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 50 }}
+        >
+          {alert.message}
+        </motion.div>
       )}
 
       {/* Main Content */}
       <div className="container">
-        {loading && <div style={{textAlign: 'center', padding: '2rem'}}>⏳ Loading...</div>}
-
         {/* Authentication Pages */}
         {currentPage === 'login' && (
           <LoginPage 
@@ -232,46 +227,149 @@ function App() {
         )}
 
         {/* Home Page */}
-        {currentPage === 'home' && !loading && (
+        {currentPage === 'home' && (
           <>
-            <div className="hero">
-              <h1>🚀 AI-Powered Smart Shopping</h1>
-              <p>✨ Price predictions • 🎯 Smart search • 📸 Visual search</p>
-            </div>
+            <HeroSection onExplore={() => {
+              const productsSection = document.querySelector('.products-section');
+              if (productsSection) {
+                productsSection.scrollIntoView({ behavior: 'smooth' });
+              }
+            }} />
 
-            {trendingProducts.length > 0 && (
-              <div style={{marginBottom: '2rem'}}>
-                <h2>🔥 Trending Now</h2>
-                <div className="trending-list">
-                  {trendingProducts.slice(0, 5).map((item, idx) => (
-                    <div key={idx} className="trending-item">
-                      <div className="trending-rank">#{idx + 1}</div>
-                      <div className="trending-info">
-                        <div className="trending-name">{item.product.name}</div>
-                        <div className="trending-stats">
-                          👁 {item.views} views • 🛒 {item.purchases} purchases
-                        </div>
-                      </div>
-                      <div style={{fontSize: '1.1rem', fontWeight: 'bold', color: '#4CAF50'}}>
-                        ${item.product.current_price}
+            {/* Featured Carousel */}
+            {featuredProducts.length > 0 && (
+              <motion.div 
+                className="carousel-container"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={carouselIndex}
+                    className="carousel-slide"
+                    initial={{ opacity: 0, x: 100 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -100 }}
+                    transition={{ duration: 0.5 }}
+                    style={{
+                      background: `linear-gradient(135deg, ${['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'][carouselIndex % 5]} 0%, ${['#059669', '#1E40AF', '#D97706', '#DC2626', '#7C3AED'][carouselIndex % 5]} 100%)`
+                    }}
+                  >
+                    <div className="carousel-content">
+                      <h2>Featured Product</h2>
+                      <h3 style={{color: 'white', marginBottom: '1rem'}}>{featuredProducts[carouselIndex].name}</h3>
+                      <p style={{color: 'rgba(255,255,255,0.9)'}}>{featuredProducts[carouselIndex].description}</p>
+                      <div style={{display: 'flex', gap: '1rem'}}>
+                        <AnimatedButton 
+                          onClick={() => handleAddToCart(featuredProducts[carouselIndex])}
+                          variant="primary"
+                        >
+                          Add to Cart
+                        </AnimatedButton>
+                        <AnimatedButton 
+                          onClick={() => setCurrentPage(`product-${featuredProducts[carouselIndex].id}`)}
+                          variant="outline"
+                        >
+                          View Details
+                        </AnimatedButton>
                       </div>
                     </div>
+                    <img 
+                      src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500&h=300&fit=crop"
+                      alt="Featured"
+                      className="carousel-image"
+                    />
+                  </motion.div>
+                </AnimatePresence>
+
+                {/* Carousel Controls */}
+                <div className="carousel-controls">
+                  {featuredProducts.map((_, idx) => (
+                    <motion.div
+                      key={idx}
+                      className={`carousel-dot ${idx === carouselIndex ? 'active' : ''}`}
+                      onClick={() => setCarouselIndex(idx)}
+                      whileHover={{ scale: 1.2 }}
+                      whileTap={{ scale: 0.9 }}
+                    />
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
 
-            <h2>Available Products</h2>
-            <div className="products-grid">
-              {products.map(product => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAddToCart={handleAddToCart}
-                  onViewDetails={() => setCurrentPage(`product-${product.id}`)}
-                />
-              ))}
-            </div>
+            {/* Trending Products Section */}
+            {trendingProducts.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                style={{ marginBottom: '3rem' }}
+              >
+                <div className="section-header">
+                  <h2>🔥 Trending Now</h2>
+                  <a className="view-all" onClick={() => setCurrentPage('trending')}>View All</a>
+                </div>
+                <div className="product-grid">
+                  {trendingProducts.slice(0, 8).map((item, idx) => (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                    >
+                      <ProductCard
+                        product={item.product}
+                        onAddCart={handleAddToCart}
+                        onViewDetails={() => setCurrentPage(`product-${item.product.id}`)}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* All Products Section */}
+            {products.length > 0 && (
+              <motion.div 
+                className="products-section"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+              >
+                <div className="section-header">
+                  <h2>All Eco-Friendly Products</h2>
+                  <span style={{color: 'var(--gray-600)'}}>Showing {products.length} products</span>
+                </div>
+                <div className="product-grid">
+                  {products.map((product, idx) => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: (idx % 8) * 0.05 }}
+                    >
+                      <ProductCard
+                        product={product}
+                        onAddCart={handleAddToCart}
+                        onViewDetails={() => setCurrentPage(`product-${product.id}`)}
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {loading && (
+              <motion.div 
+                className="loading-container"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <div className="loading"></div>
+                <span className="loading-text">Loading products...</span>
+              </motion.div>
+            )}
           </>
         )}
 
@@ -286,246 +384,164 @@ function App() {
 
         {/* Search Results */}
         {currentPage === 'search' && searchResults && (
-          <>
-            <button onClick={() => setCurrentPage('home')} className="btn btn-outline">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <AnimatedButton onClick={() => setCurrentPage('home')} variant="outline">
               ← Back
-            </button>
-            <h2>Search Results</h2>
+            </AnimatedButton>
+            <h2 style={{marginTop: '2rem', marginBottom: '1.5rem'}}>Search Results</h2>
             {Object.entries(searchResults).map(([category, items]) => (
-              <div key={category} className="category-section">
-                <div className="category-title">{category}</div>
-                <div className="category-products">
+              <motion.div 
+                key={category}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{marginBottom: '3rem'}}
+              >
+                <h3 style={{marginBottom: '1.5rem', color: 'var(--primary)'}}>{category}</h3>
+                <div className="product-grid">
                   {items.map(item => (
                     <ProductCard
                       key={item.product.id}
                       product={item.product}
-                      onAddToCart={handleAddToCart}
+                      onAddCart={handleAddToCart}
                       onViewDetails={() => setCurrentPage(`product-${item.product.id}`)}
                     />
                   ))}
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </>
+          </motion.div>
         )}
 
         {/* Trending Page */}
         {currentPage === 'trending' && (
-          <>
-            <button onClick={() => setCurrentPage('home')} className="btn btn-outline">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <AnimatedButton onClick={() => setCurrentPage('home')} variant="outline">
               ← Back
-            </button>
-            <h2>🔥 Trending Products</h2>
-            <div className="products-grid">
+            </AnimatedButton>
+            <h2 style={{marginTop: '2rem', marginBottom: '1.5rem'}}>🔥 Trending Products</h2>
+            <div className="product-grid">
               {trendingProducts.map((item, idx) => (
-                <ProductCard
+                <motion.div
                   key={idx}
-                  product={item.product}
-                  onAddToCart={handleAddToCart}
-                  onViewDetails={() => setCurrentPage(`product-${item.product.id}`)}
-                />
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                >
+                  <ProductCard
+                    product={item.product}
+                    onAddCart={handleAddToCart}
+                    onViewDetails={() => setCurrentPage(`product-${item.product.id}`)}
+                  />
+                </motion.div>
               ))}
             </div>
-          </>
-        )}
-
-        {/* Visual Search */}
-        {currentPage === 'visual' && (
-          <>
-            <button onClick={() => setCurrentPage('home')} className="btn btn-outline">
-              ← Back
-            </button>
-            <div className="visual-search-container">
-              <h2>📸 Visual Search - Upload an Image</h2>
-              <div className="upload-area" onClick={() => document.getElementById('visualInput').click()}>
-                <p>📤 Click to upload or drag and drop</p>
-                <input
-                  id="visualInput"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleVisualSearch}
-                />
-              </div>
-            </div>
-          </>
+          </motion.div>
         )}
 
         {/* Cart Page */}
         {currentPage === 'cart' && (
-          <>
-            <button onClick={() => setCurrentPage('home')} className="btn btn-outline">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <AnimatedButton onClick={() => setCurrentPage('home')} variant="outline">
               ← Continue Shopping
-            </button>
-            <h2>🛒 Shopping Cart</h2>
+            </AnimatedButton>
+            <h2 style={{marginTop: '2rem', marginBottom: '1.5rem'}}>🛒 Shopping Cart</h2>
             {cart.length === 0 ? (
-              <div style={{textAlign: 'center', padding: '2rem'}}>
+              <motion.div 
+                className="empty-state"
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+              >
+                <p style={{fontSize: '3rem', marginBottom: '1rem'}}>🛒</p>
                 <p>Your cart is empty</p>
-                <button onClick={() => setCurrentPage('home')} className="btn btn-primary">
+                <AnimatedButton onClick={() => setCurrentPage('home')} variant="primary" style={{marginTop: '1rem'}}>
                   Continue Shopping
-                </button>
-              </div>
+                </AnimatedButton>
+              </motion.div>
             ) : (
-              <>
-                <div style={{background: 'white', borderRadius: '8px', padding: '1rem', marginBottom: '2rem'}}>
-                  {cart.map(item => (
-                    <div key={item.id} className="cart-item" style={{flexDirection: 'column', alignItems: 'flex-start'}}>
-                      <div style={{display: 'flex', justifyContent: 'space-between', width: '100%'}}>
-                        <div>
-                          <h3>{item.name}</h3>
-                          <p>${item.current_price} each</p>
-                        </div>
-                        <button
-                          onClick={() => handleRemoveFromCart(item.id)}
-                          className="btn btn-outline"
-                          style={{flex: 'none'}}
-                        >
-                          Remove
-                        </button>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div style={{background: 'white', borderRadius: '12px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-md)'}}>
+                  {cart.map((item, idx) => (
+                    <motion.div 
+                      key={item.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      style={{display: 'flex', justifyContent: 'space-between', padding: '1rem', borderBottom: idx < cart.length - 1 ? '1px solid var(--border)' : 'none'}}
+                    >
+                      <div>
+                        <h3 style={{margin: 0, marginBottom: '0.5rem'}}>{item.name}</h3>
+                        <p style={{margin: 0, color: 'var(--gray-600)'}}>${item.current_price}</p>
                       </div>
-                      <div className="cart-item-quantity" style={{marginTop: '0.5rem'}}>
-                        <button onClick={() => handleCartQuantityChange(item.id, item.quantity - 1)}>−</button>
-                        <span style={{margin: '0 0.5rem'}}>{item.quantity}</span>
-                        <button onClick={() => handleCartQuantityChange(item.id, item.quantity + 1)}>+</button>
-                      </div>
-                    </div>
+                      <AnimatedButton 
+                        onClick={() => handleRemoveFromCart(item.id)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        Remove
+                      </AnimatedButton>
+                    </motion.div>
                   ))}
                 </div>
 
-                <div style={{background: 'white', borderRadius: '8px', padding: '2rem', marginBottom: '2rem'}}>
-                  <div className="cart-total">
+                <div style={{background: 'white', borderRadius: '12px', padding: '2rem', boxShadow: 'var(--shadow-md)'}}>
+                  <div style={{fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '1.5rem', textAlign: 'center'}}>
                     Total: ${cartTotal.toFixed(2)}
                   </div>
-                  <button className="btn btn-primary" style={{width: '100%'}}>
+                  <AnimatedButton 
+                    onClick={() => {
+                      if (!authToken) {
+                        showAlert('Please login to checkout', 'error');
+                        setCurrentPage('login');
+                        return;
+                      }
+                      setCurrentPage('checkout');
+                    }} 
+                    variant="primary" 
+                    size="lg" 
+                    style={{width: '100%', justifyContent: 'center'}}
+                  >
                     💳 Proceed to Checkout
-                  </button>
+                  </AnimatedButton>
                 </div>
-              </>
+              </motion.div>
             )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Product Card Component
-function ProductCard({ product, onAddToCart, onViewDetails }) {
-  const [prediction, setPrediction] = useState(null);
-
-  useEffect(() => {
-    // Load price prediction
-    const loadPrediction = async () => {
-      try {
-        const data = await apiService.getPricePrediction(product.id);
-        if (data.status === 'success' && data.prediction) {
-          setPrediction(data.prediction);
-        }
-      } catch (error) {
-        console.error('Error loading prediction:', error);
-      }
-    };
-    loadPrediction();
-  }, [product.id]);
-
-  return (
-    <div className="product-card">
-      {product.image_url && (
-        <img src={product.image_url} alt={product.name} className="product-image" />
-      )}
-      <div className="product-info">
-        <div className="product-name">{product.name}</div>
-        <div className="product-category">{product.category.name}</div>
-        <div className="product-price">${product.current_price}</div>
-
-        {prediction && (
-          <div className={`price-prediction ${prediction.recommendation === 'best_price' ? 'best' : 'wait'}`}>
-            {prediction.recommendation === 'best_price' && '🟢 Best Price'}
-            {prediction.recommendation === 'wait' && '🟡 Wait - Price Drop Likely'}
-            {prediction.recommendation === 'neutral' && '⚪ Neutral'}
-          </div>
+          </motion.div>
         )}
 
-        <div className="product-actions">
-          <button onClick={onViewDetails} className="btn btn-secondary">View</button>
-          <button onClick={() => onAddToCart(product)} className="btn btn-primary">Add</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+        {/* Checkout Page */}
+        {currentPage === 'checkout' && (
+          <CheckoutPage
+            cart={cart}
+            onBack={() => setCurrentPage('cart')}
+            onOrderSuccess={(order) => {
+              setCart([]);
+              showAlert('Order placed successfully!', 'success');
+              setTimeout(() => setCurrentPage('home'), 2000);
+            }}
+            authToken={authToken}
+          />
+        )}
 
-// Product Detail View Component
-function ProductDetailView({ productId, onAddToCart, onBack }) {
-  const [product, setProduct] = useState(null);
-  const [prediction, setPrediction] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const loadProduct = async () => {
-      try {
-        const data = await apiService.getProductDetail(productId);
-        if (data.status === 'success') {
-          setProduct(data.product);
-          setPrediction(data.price_prediction);
-        }
-      } catch (error) {
-        console.error('Error loading product:', error);
-      }
-      setLoading(false);
-    };
-    loadProduct();
-  }, [productId]);
-
-  if (loading) return <div>Loading...</div>;
-
-  if (!product) return <div>Product not found</div>;
-
-  return (
-    <div>
-      <button onClick={onBack} className="btn btn-outline">← Back</button>
-      
-      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2rem'}}>
-        <div>
-          {product.image_url && (
-            <img src={product.image_url} alt={product.name} style={{borderRadius: '8px'}} />
-          )}
-        </div>
-
-        <div>
-          <h1>{product.name}</h1>
-          <p style={{color: '#666', marginBottom: '1rem'}}>{product.category.name}</p>
-
-          <h2 style={{fontSize: '2rem', color: '#4CAF50', marginBottom: '1rem'}}>
-            ${product.current_price}
-          </h2>
-
-          {prediction && (
-            <div style={{
-              background: prediction.recommendation === 'best_price' ? '#c8e6c9' : '#ffe0b2',
-              padding: '1rem',
-              borderRadius: '8px',
-              marginBottom: '1rem'
-            }}>
-              <strong>📊 7-Day Price Prediction:</strong>
-              {prediction.recommendation === 'best_price' && (
-                <p>🟢 This is a great price to buy! Price is likely to increase.</p>
-              )}
-              {prediction.recommendation === 'wait' && (
-                <p>🟡 Price may drop further. Consider waiting for a few days.</p>
-              )}
-              <p>Confidence: {(prediction.confidence_score * 100).toFixed(1)}%</p>
-            </div>
-          )}
-
-          <p style={{marginBottom: '2rem'}}>{product.description}</p>
-
-          <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
-            <button onClick={() => onAddToCart(product)} className="btn btn-primary" style={{padding: '1rem'}}>
-              🛒 Add to Cart
-            </button>
-            <button onClick={onBack} className="btn btn-outline">Back</button>
-          </div>
-        </div>
+        {/* Profile Page */}
+        {currentPage === 'profile' && (
+          <ProfilePage
+            user={user}
+            authToken={authToken}
+            onBack={() => setCurrentPage('home')}
+          />
+        )}
       </div>
     </div>
   );

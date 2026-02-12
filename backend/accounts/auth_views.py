@@ -44,7 +44,10 @@ def login_view(request):
         user = authenticate(username=username, password=password)
         if user is not None:
             refresh = RefreshToken.for_user(user)
-            profile = UserProfile.objects.get(user=user)
+            try:
+                profile = UserProfile.objects.get(user=user)
+            except UserProfile.DoesNotExist:
+                profile = UserProfile.objects.create(user=user)
             return Response({
                 'status': 'success',
                 'message': 'Login successful',
