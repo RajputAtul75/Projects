@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './modern-styles.css';
 import './App.css';
+import './auth-styles.css';
 import { apiService } from './api';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
