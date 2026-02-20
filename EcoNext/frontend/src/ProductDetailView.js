@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ShoppingCart, AlertCircle } from 'lucide-react';
 import { apiService } from './api';
-import { AnimatedButton, Skeleton } from './components';
+import { AnimatedButton, Skeleton, PricePredictorCard } from './components';
 
 export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
   const [product, setProduct] = useState(null);
@@ -74,16 +74,6 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
       </motion.div>
     );
   }
-
-  const getPredictionColor = () => {
-    if (!prediction) return '#999';
-    return prediction.recommendation === 'best_price' ? '#4CAF50' : '#FF9800';
-  };
-
-  const getPredictionBg = () => {
-    if (!prediction) return '#f5f5f5';
-    return prediction.recommendation === 'best_price' ? '#e8f5e9' : '#fff3e0';
-  };
 
   return (
     <motion.div
@@ -172,30 +162,13 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
             )}
           </motion.div>
 
-          {/* Prediction */}
+          {/* Price Predictor Component */}
           {prediction && (
-            <motion.div 
-              className="prediction-box"
-              style={{ backgroundColor: getPredictionBg(), borderLeftColor: getPredictionColor() }}
-              variants={itemVariants}
-              whileHover={{ scale: 1.02 }}
-            >
-              <div className="prediction-header">
-                <span className="prediction-icon">📊</span>
-                <strong>7-Day Price Prediction</strong>
-              </div>
-              {prediction.recommendation === 'best_price' && (
-                <p>🟢 <strong>Best Price!</strong> This is a great price to buy. Price is likely to increase.</p>
-              )}
-              {prediction.recommendation === 'wait' && (
-                <p>🟡 <strong>Wait</strong> - Price may drop further. Consider waiting a few days.</p>
-              )}
-              {prediction.recommendation === 'neutral' && (
-                <p>⚪ <strong>Neutral</strong> - Price is expected to remain stable.</p>
-              )}
-              <p className="confidence">
-                Confidence: {Math.round((prediction.confidence_score || 0) * 100)}%
-              </p>
+            <motion.div variants={itemVariants}>
+              <PricePredictorCard 
+                prediction={prediction} 
+                currentPrice={product.current_price}
+              />
             </motion.div>
           )}
 

@@ -100,6 +100,7 @@ class PricePredictor:
             day5_price=predictions[4],
             day6_price=predictions[5],
             day7_price=predictions[6],
+            price_change=result['price_change'],
             recommendation=result['recommendation'],
             confidence_score=result['confidence']
         )

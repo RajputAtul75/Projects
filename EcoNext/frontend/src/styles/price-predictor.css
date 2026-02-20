@@ -1,0 +1,371 @@
+/* Price Predictor Card Styles */
+
+.price-predictor-card {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 16px;
+  padding: 28px;
+  margin: 24px 0;
+  border-left: 6px solid #2196F3;
+  box-shadow: 0 8px 32px rgba(33, 150, 243, 0.15);
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.price-predictor-card.bg-success {
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border-left-color: #4caf50;
+  box-shadow: 0 8px 32px rgba(76, 175, 80, 0.15);
+}
+
+.price-predictor-card.bg-warning {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  border-left-color: #ff9800;
+  box-shadow: 0 8px 32px rgba(255, 152, 0, 0.15);
+}
+
+.price-predictor-card.bg-neutral {
+  background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+  border-left-color: #9c27b0;
+  box-shadow: 0 8px 32px rgba(156, 39, 176, 0.15);
+}
+
+.price-predictor-placeholder {
+  background: #f5f5f5;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  color: #999;
+  font-style: italic;
+}
+
+/* Header */
+.predictor-header {
+  margin-bottom: 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  padding-bottom: 16px;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.predictor-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.recommendation-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.icon-up {
+  color: #4caf50;
+  animation: slideUp 0.6s ease infinite;
+}
+
+.icon-down {
+  color: #ff9800;
+  animation: slideDown 0.6s ease infinite;
+}
+
+.icon-neutral {
+  color: #9c27b0;
+  animation: pulse 1.5s ease infinite;
+}
+
+@keyframes slideUp {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes slideDown {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.recommendation-text {
+  color: #333;
+}
+
+/* Price Analysis */
+.price-analysis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.analysis-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.analysis-item .label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analysis-item .value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #333;
+}
+
+.analysis-item .value.positive {
+  color: #4caf50;
+}
+
+.analysis-item .value.negative {
+  color: #f44336;
+}
+
+/* Confidence Bar */
+.confidence-bar {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  height: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.confidence-fill {
+  background: linear-gradient(90deg, #4caf50 0%, #81c784 100%);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  transition: width 0.6s ease;
+  border-radius: 8px;
+}
+
+/* Forecast Chart */
+.forecast-chart {
+  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.chart-container {
+  width: 100%;
+  height: 200px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.chart-bars {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  width: 100%;
+  height: 100%;
+  gap: 8px;
+}
+
+.chart-bar-wrapper {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.chart-bar {
+  width: 100%;
+  background: linear-gradient(180deg, #4caf50 0%, #81c784 100%);
+  border-radius: 8px 8px 0 0;
+  transition: all 0.3s ease;
+  position: relative;
+  min-height: 10px;
+}
+
+.chart-bar-wrapper:hover .chart-bar {
+  background: linear-gradient(180deg, #45a049 0%, #66bb6a 100%);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.price-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.chart-bar-wrapper:hover .price-tooltip {
+  opacity: 1;
+}
+
+.day-label {
+  font-size: 11px;
+  color: #666;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+/* Recommendation Message */
+.recommendation-message {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-left: 4px solid #2196F3;
+}
+
+.recommendation-message.best_price {
+  border-left-color: #4caf50;
+}
+
+.recommendation-message.wait {
+  border-left-color: #ff9800;
+}
+
+.recommendation-message.neutral {
+  border-left-color: #9c27b0;
+}
+
+.recommendation-message h4 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.recommendation-message p {
+  margin: 0;
+  font-size: 14px;
+  color: #555;
+  line-height: 1.5;
+}
+
+/* Disclaimer */
+.disclaimer {
+  font-size: 12px;
+  color: #777;
+  font-style: italic;
+  margin: 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .price-predictor-card {
+    padding: 16px;
+    margin: 16px 0;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .recommendation-badge {
+    align-self: flex-start;
+  }
+
+  .price-analysis {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .forecast-chart {
+    padding: 12px;
+  }
+
+  .chart-container {
+    height: 150px;
+  }
+
+  .chart-bars {
+    gap: 4px;
+  }
+
+  .day-label {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .price-predictor-card {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .predictor-title {
+    font-size: 16px;
+  }
+
+  .price-analysis {
+    grid-template-columns: 1fr;
+  }
+
+  .recommendation-badge {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+
+  .chart-container {
+    height: 120px;
+  }
+
+  .recommendation-message {
+    padding: 12px;
+  }
+
+  .recommendation-message h4 {
+    font-size: 14px;
+  }
+
+  .recommendation-message p {
+    font-size: 12px;
+  }
+}

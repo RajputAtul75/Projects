@@ -3,3 +3,4 @@ export { ProductCard } from './ProductCard';
 export { HeroSection } from './HeroSection';
 export { Modal } from './Modal';
 export { Skeleton } from './Skeleton';
+export { PricePredictorCard } from './PricePredictorCard';

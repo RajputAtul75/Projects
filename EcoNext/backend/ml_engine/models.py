@@ -15,6 +15,9 @@ class PricePrediction(models.Model):
     day6_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     day7_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     
+    # Price change percentage
+    price_change = models.FloatField(default=0.0, help_text="Percentage change in price")
+    
     # Recommendation
     recommendation = models.CharField(
         max_length=20, 

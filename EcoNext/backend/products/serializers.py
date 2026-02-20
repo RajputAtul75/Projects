@@ -31,7 +31,7 @@ class PricePredictionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'product', 'prediction_date', 'day1_price', 'day2_price',
             'day3_price', 'day4_price', 'day5_price', 'day6_price', 'day7_price',
-            'recommendation', 'confidence_score'
+            'price_change', 'recommendation', 'confidence_score'
         ]
 
 

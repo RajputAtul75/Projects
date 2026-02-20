@@ -121,8 +121,10 @@ def update_profile_view(request):
             profile.city = request.data['city']
         if 'country' in request.data:
             profile.country = request.data['country']
-        if 'postal_code' in request.data:
-            profile.postal_code = request.data['postal_code']
+        if 'zipcode' in request.data:
+            profile.zipcode = request.data['zipcode']
+        if 'state' in request.data:
+            profile.state = request.data['state']
         profile.save()
         
         return Response({

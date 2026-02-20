@@ -13,7 +13,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = UserProfile
-        fields = ('user', 'phone', 'address', 'city', 'country', 'postal_code', 'created_at')
+        fields = ('user', 'phone', 'address', 'city', 'state', 'zipcode', 'country', 'created_at')
 
 class SignUpSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})

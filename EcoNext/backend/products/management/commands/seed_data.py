@@ -9,7 +9,7 @@ class Command(BaseCommand):
     help = 'Seed database with sample products and data'
 
     def handle(self, *args, **options):
-        self.stdout.write("🌱 Seeding database with sample data...")
+        self.stdout.write("Seeding database with sample data...")
 
         # Create categories
         categories_data = [
@@ -28,7 +28,7 @@ class Command(BaseCommand):
             )
             categories[cat_data['name']] = cat
             if created:
-                self.stdout.write(f"✓ Created category: {cat_data['name']}")
+                self.stdout.write(f"Created category: {cat_data['name']}")
 
         # Sample eco-friendly products
         products_data = [
@@ -406,7 +406,7 @@ class Command(BaseCommand):
             )
 
             if created:
-                self.stdout.write(f"✓ Created product: {prod_data['name']}")
+                self.stdout.write(f"Created product: {prod_data['name']}")
 
                 # Create price history (last 60 days)
                 current_price = prod_data['price']
@@ -431,10 +431,10 @@ class Command(BaseCommand):
                     from ml_engine.price_predictor import PricePredictor
                     predictor = PricePredictor()
                     predictor.save_predictions(product)
-                    self.stdout.write(f"  ✓ Created price prediction for {prod_data['name']}")
+                    self.stdout.write(f"  Created price prediction for {prod_data['name']}")
                 except Exception as e:
-                    self.stdout.write(f"  ⚠ Could not create prediction for {prod_data['name']}: {str(e)}")
+                    self.stdout.write(f"  Warning: Could not create prediction for {prod_data['name']}: {str(e)}")
             else:
-                self.stdout.write(f"✓ Product exists: {prod_data['name']}")
+                self.stdout.write(f"Product exists: {prod_data['name']}")
 
-        self.stdout.write(self.style.SUCCESS('✅ Database seeded successfully!'))
+        self.stdout.write(self.style.SUCCESS('Database seeded successfully!'))
