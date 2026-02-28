@@ -84,8 +84,8 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
     >
       {/* Back Button */}
       <motion.div variants={itemVariants}>
-        <AnimatedButton 
-          onClick={onBack} 
+        <AnimatedButton
+          onClick={onBack}
           variant="outline"
           size="sm"
         >
@@ -95,12 +95,12 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
       </motion.div>
 
       {/* Main Content */}
-      <motion.div 
+      <motion.div
         className="product-detail-grid"
         variants={itemVariants}
       >
         {/* Image */}
-        <motion.div 
+        <motion.div
           className="product-detail-image"
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -130,7 +130,7 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
           </motion.h1>
 
           {/* Category */}
-          <motion.p 
+          <motion.p
             className="product-category-text"
             variants={itemVariants}
           >
@@ -138,26 +138,26 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
           </motion.p>
 
           {/* Price */}
-          <motion.div 
+          <motion.div
             className="price-section"
             variants={itemVariants}
           >
-            <motion.div 
+            <motion.div
               className="current-price"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.3 }}
             >
-              ${product.current_price?.toFixed(2) || '0.00'}
+              ₹{product.current_price ? Number(product.current_price).toFixed(2) : '0.00'}
             </motion.div>
-            {product.original_price && product.original_price > product.current_price && (
-              <motion.span 
+            {product.original_price && Number(product.original_price) > Number(product.current_price) && (
+              <motion.span
                 className="original-price"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.4 }}
               >
-                ${product.original_price.toFixed(2)}
+                ₹{Number(product.original_price).toFixed(2)}
               </motion.span>
             )}
           </motion.div>
@@ -165,8 +165,8 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
           {/* Price Predictor Component */}
           {prediction && (
             <motion.div variants={itemVariants}>
-              <PricePredictorCard 
-                prediction={prediction} 
+              <PricePredictorCard
+                prediction={prediction}
                 currentPrice={product.current_price}
               />
             </motion.div>
@@ -174,7 +174,7 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
 
           {/* Description */}
           {product.description && (
-            <motion.div 
+            <motion.div
               className="description-section"
               variants={itemVariants}
             >
@@ -185,7 +185,7 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
 
           {/* Stock Status */}
           {product.stock_quantity !== undefined && (
-            <motion.div 
+            <motion.div
               className="stock-section"
               variants={itemVariants}
             >
@@ -196,11 +196,11 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
           )}
 
           {/* Actions */}
-          <motion.div 
+          <motion.div
             className="action-buttons"
             variants={itemVariants}
           >
-            <AnimatedButton 
+            <AnimatedButton
               onClick={() => onAddToCart(product)}
               variant="primary"
               size="lg"
@@ -208,7 +208,7 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
               <ShoppingCart size={20} />
               Add to Cart
             </AnimatedButton>
-            <AnimatedButton 
+            <AnimatedButton
               onClick={onBack}
               variant="outline"
               size="lg"

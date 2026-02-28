@@ -350,7 +350,7 @@ export const ProfilePage = ({ user, authToken, onBack }) => {
           }}
         >
           <h2 style={{ marginBottom: '1.5rem' }}>Order History</h2>
-          
+
           {orders.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#999' }}>
               <p style={{ fontSize: '3rem', marginBottom: '1rem' }}>📦</p>
@@ -385,7 +385,7 @@ export const ProfilePage = ({ user, authToken, onBack }) => {
                     </span>
                   </div>
                   <p style={{ margin: '0.5rem 0', fontSize: '0.9rem', color: '#666' }}>
-                    Total: <strong>${order.total_price}</strong>
+                    Total: <strong>₹{order.total_price}</strong>
                   </p>
                   <p style={{ margin: '0.5rem 0', fontSize: '0.85rem', color: '#999' }}>
                     {new Date(order.created_at).toLocaleDateString()}

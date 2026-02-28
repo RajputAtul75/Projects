@@ -9,8 +9,8 @@ export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
 
   const containerVariants = {
     initial: { opacity: 0, y: 20 },
-    animate: { 
-      opacity: 1, 
+    animate: {
+      opacity: 1,
       y: 0,
       transition: { duration: 0.4 }
     },
@@ -44,7 +44,7 @@ export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
       {/* Image Container */}
       <motion.div className={styles.imageContainer}>
         <motion.img
-          src={product.image || 'https://via.placeholder.com/250'}
+          src={product.image_url || 'https://via.placeholder.com/250'}
           alt={product.name}
           className={styles.image}
           variants={imageVariants}
@@ -53,7 +53,7 @@ export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
           onLoad={() => setIsImageLoaded(true)}
         />
         {!isImageLoaded && (
-          <motion.div 
+          <motion.div
             className={styles.skeleton}
             animate={{ opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 1.5, repeat: Infinity }}
@@ -79,8 +79,8 @@ export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
           whileTap={{ scale: 0.9 }}
           onClick={() => setIsFavorited(!isFavorited)}
         >
-          <Heart 
-            size={20} 
+          <Heart
+            size={20}
             fill={isFavorited ? 'currentColor' : 'none'}
             color={isFavorited ? '#f44336' : '#999'}
           />
@@ -89,35 +89,35 @@ export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
 
       {/* Content */}
       <div className={styles.content}>
-        <motion.h3 
+        <motion.h3
           className={styles.title}
           whileHover={{ color: '#4CAF50' }}
         >
           {product.name}
         </motion.h3>
-        
+
         <p className={styles.description}>
           {product.description?.substring(0, 60) || 'No description'}...
         </p>
 
         {/* Price Section */}
         <div className={styles.priceSection}>
-          <motion.div 
+          <motion.div
             className={styles.price}
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ delay: 0.2 }}
           >
-            ${product.price?.toFixed(2) || '0.00'}
+            ₹{product.price ? Number(product.price).toFixed(2) : '0.00'}
           </motion.div>
           {product.originalPrice && (
-            <motion.span 
+            <motion.span
               className={styles.originalPrice}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
             >
-              ${product.originalPrice?.toFixed(2)}
+              ₹{Number(product.originalPrice).toFixed(2)}
             </motion.span>
           )}
         </div>
@@ -131,7 +131,7 @@ export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
         )}
 
         {/* Actions */}
-        <motion.div 
+        <motion.div
           className={styles.actions}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

@@ -14,7 +14,7 @@ export const PricePredictorCard = ({ prediction, currentPrice }) => {
 
   if (!displayData) {
     return (
-      <motion.div 
+      <motion.div
         className="price-predictor-placeholder"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -107,13 +107,13 @@ export const PricePredictorCard = ({ prediction, currentPrice }) => {
       <div className="price-analysis">
         <div className="analysis-item">
           <span className="label">Current Price</span>
-          <div className="value">${parseFloat(currentPrice).toFixed(2)}</div>
+          <div className="value">₹{parseFloat(currentPrice).toFixed(2)}</div>
         </div>
 
         <div className="analysis-item">
           <span className="label">7-Day Avg</span>
           <div className="value">
-            ${(prices.reduce((a, b) => a + b, 0) / 7).toFixed(2)}
+            ₹{(prices.reduce((a, b) => a + b, 0) / 7).toFixed(2)}
           </div>
         </div>
 
@@ -140,10 +140,10 @@ export const PricePredictorCard = ({ prediction, currentPrice }) => {
         <div className="chart-container">
           <div className="chart-bars">
             {prices.map((price, index) => {
-              const normalizedHeight = priceRange > 0 
+              const normalizedHeight = priceRange > 0
                 ? ((price - minPrice) / priceRange) * 100 + 20
                 : 50;
-              
+
               return (
                 <motion.div
                   key={index}
@@ -161,7 +161,7 @@ export const PricePredictorCard = ({ prediction, currentPrice }) => {
                     whileHover={{ scaleY: 1.1 }}
                   >
                     <span className="price-tooltip">
-                      ${parseFloat(price).toFixed(2)}
+                      ₹{parseFloat(price).toFixed(2)}
                     </span>
                   </motion.div>
                   <span className="day-label">Day {index + 1}</span>

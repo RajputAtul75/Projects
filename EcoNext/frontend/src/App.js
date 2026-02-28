@@ -7,12 +7,12 @@ import SignupPage from './SignupPage';
 import ProductDetailView from './ProductDetailView';
 import CheckoutPage from './CheckoutPage';
 import ProfilePage from './ProfilePage';
-import { 
-  AnimatedButton, 
-  ProductCard, 
-  HeroSection, 
-  Modal, 
-  Skeleton 
+import {
+  AnimatedButton,
+  ProductCard,
+  HeroSection,
+  Modal,
+  Skeleton
 } from './components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Leaf } from 'lucide-react';
@@ -114,7 +114,7 @@ function App() {
   const handleSearch = async (e) => {
     e.preventDefault();
     const query = e.target.querySelector('.search-input').value;
-    
+
     if (!query.trim()) return;
 
     setLoading(true);
@@ -132,7 +132,7 @@ function App() {
 
   const handleAddToCart = (product) => {
     const existingItem = cart.find(item => item.id === product.id);
-    
+
     if (existingItem) {
       setCart(cart.map(item =>
         item.id === product.id
@@ -142,7 +142,7 @@ function App() {
     } else {
       setCart([...cart, { ...product, quantity: 1 }]);
     }
-    
+
     showAlert(`${product.name} added to cart!`, 'success');
   };
 
@@ -163,11 +163,11 @@ function App() {
       {/* Header */}
       <header>
         <nav>
-          <div className="logo" onClick={() => setCurrentPage('home')} style={{cursor: 'pointer'}}>
-            <Leaf size={24} style={{display: 'inline-block', marginRight: '8px'}} />
+          <div className="logo" onClick={() => setCurrentPage('home')} style={{ cursor: 'pointer' }}>
+            <Leaf size={24} style={{ display: 'inline-block', marginRight: '8px' }} />
             EcoNext
           </div>
-          
+
           <form className="search-bar" onSubmit={handleSearch}>
             <input
               type="text"
@@ -181,11 +181,11 @@ function App() {
             <li><a onClick={() => setCurrentPage('home')}>Home</a></li>
             <li><a onClick={() => setCurrentPage('trending')}>Trending</a></li>
             <li><a onClick={() => setCurrentPage('cart')}>🛒 Cart ({cart.length})</a></li>
-            
+
             {user ? (
               <>
                 <li><a onClick={() => setCurrentPage('profile')}>👤 {user.username}</a></li>
-                <li><a onClick={handleLogout} style={{color: '#EF4444'}}>Logout</a></li>
+                <li><a onClick={handleLogout} style={{ color: '#EF4444' }}>Logout</a></li>
               </>
             ) : (
               <>
@@ -199,7 +199,7 @@ function App() {
 
       {/* Alerts */}
       {alert && (
-        <motion.div 
+        <motion.div
           className={`alert alert-${alert.type}`}
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
@@ -213,14 +213,14 @@ function App() {
       <div className="container">
         {/* Authentication Pages */}
         {currentPage === 'login' && (
-          <LoginPage 
+          <LoginPage
             onLoginSuccess={handleLoginSuccess}
             onSwitchPage={setCurrentPage}
           />
         )}
 
         {currentPage === 'signup' && (
-          <SignupPage 
+          <SignupPage
             onSignupSuccess={handleSignupSuccess}
             onSwitchPage={setCurrentPage}
           />
@@ -238,7 +238,7 @@ function App() {
 
             {/* Featured Carousel */}
             {featuredProducts.length > 0 && (
-              <motion.div 
+              <motion.div
                 className="carousel-container"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -258,16 +258,16 @@ function App() {
                   >
                     <div className="carousel-content">
                       <h2>Featured Product</h2>
-                      <h3 style={{color: 'white', marginBottom: '1rem'}}>{featuredProducts[carouselIndex].name}</h3>
-                      <p style={{color: 'rgba(255,255,255,0.9)'}}>{featuredProducts[carouselIndex].description}</p>
-                      <div style={{display: 'flex', gap: '1rem'}}>
-                        <AnimatedButton 
+                      <h3 style={{ color: 'white', marginBottom: '1rem' }}>{featuredProducts[carouselIndex].name}</h3>
+                      <p style={{ color: 'rgba(255,255,255,0.9)' }}>{featuredProducts[carouselIndex].description}</p>
+                      <div style={{ display: 'flex', gap: '1rem' }}>
+                        <AnimatedButton
                           onClick={() => handleAddToCart(featuredProducts[carouselIndex])}
                           variant="primary"
                         >
                           Add to Cart
                         </AnimatedButton>
-                        <AnimatedButton 
+                        <AnimatedButton
                           onClick={() => setCurrentPage(`product-${featuredProducts[carouselIndex].id}`)}
                           variant="outline"
                         >
@@ -275,7 +275,7 @@ function App() {
                         </AnimatedButton>
                       </div>
                     </div>
-                    <img 
+                    <img
                       src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500&h=300&fit=crop"
                       alt="Featured"
                       className="carousel-image"
@@ -331,7 +331,7 @@ function App() {
 
             {/* All Products Section */}
             {products.length > 0 && (
-              <motion.div 
+              <motion.div
                 className="products-section"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -339,7 +339,7 @@ function App() {
               >
                 <div className="section-header">
                   <h2>All Eco-Friendly Products</h2>
-                  <span style={{color: 'var(--gray-600)'}}>Showing {products.length} products</span>
+                  <span style={{ color: 'var(--gray-600)' }}>Showing {products.length} products</span>
                 </div>
                 <div className="product-grid">
                   {products.map((product, idx) => (
@@ -361,7 +361,7 @@ function App() {
             )}
 
             {loading && (
-              <motion.div 
+              <motion.div
                 className="loading-container"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -391,15 +391,15 @@ function App() {
             <AnimatedButton onClick={() => setCurrentPage('home')} variant="outline">
               ← Back
             </AnimatedButton>
-            <h2 style={{marginTop: '2rem', marginBottom: '1.5rem'}}>Search Results</h2>
+            <h2 style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>Search Results</h2>
             {Object.entries(searchResults).map(([category, items]) => (
-              <motion.div 
+              <motion.div
                 key={category}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                style={{marginBottom: '3rem'}}
+                style={{ marginBottom: '3rem' }}
               >
-                <h3 style={{marginBottom: '1.5rem', color: 'var(--primary)'}}>{category}</h3>
+                <h3 style={{ marginBottom: '1.5rem', color: 'var(--primary)' }}>{category}</h3>
                 <div className="product-grid">
                   {items.map(item => (
                     <ProductCard
@@ -424,7 +424,7 @@ function App() {
             <AnimatedButton onClick={() => setCurrentPage('home')} variant="outline">
               ← Back
             </AnimatedButton>
-            <h2 style={{marginTop: '2rem', marginBottom: '1.5rem'}}>🔥 Trending Products</h2>
+            <h2 style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>🔥 Trending Products</h2>
             <div className="product-grid">
               {trendingProducts.map((item, idx) => (
                 <motion.div
@@ -453,16 +453,16 @@ function App() {
             <AnimatedButton onClick={() => setCurrentPage('home')} variant="outline">
               ← Continue Shopping
             </AnimatedButton>
-            <h2 style={{marginTop: '2rem', marginBottom: '1.5rem'}}>🛒 Shopping Cart</h2>
+            <h2 style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>🛒 Shopping Cart</h2>
             {cart.length === 0 ? (
-              <motion.div 
+              <motion.div
                 className="empty-state"
                 initial={{ scale: 0.9 }}
                 animate={{ scale: 1 }}
               >
-                <p style={{fontSize: '3rem', marginBottom: '1rem'}}>🛒</p>
+                <p style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛒</p>
                 <p>Your cart is empty</p>
-                <AnimatedButton onClick={() => setCurrentPage('home')} variant="primary" style={{marginTop: '1rem'}}>
+                <AnimatedButton onClick={() => setCurrentPage('home')} variant="primary" style={{ marginTop: '1rem' }}>
                   Continue Shopping
                 </AnimatedButton>
               </motion.div>
@@ -471,20 +471,20 @@ function App() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <div style={{background: 'white', borderRadius: '12px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-md)'}}>
+                <div style={{ background: 'white', borderRadius: '12px', padding: '1.5rem', marginBottom: '2rem', boxShadow: 'var(--shadow-md)' }}>
                   {cart.map((item, idx) => (
-                    <motion.div 
+                    <motion.div
                       key={item.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.05 }}
-                      style={{display: 'flex', justifyContent: 'space-between', padding: '1rem', borderBottom: idx < cart.length - 1 ? '1px solid var(--border)' : 'none'}}
+                      style={{ display: 'flex', justifyContent: 'space-between', padding: '1rem', borderBottom: idx < cart.length - 1 ? '1px solid var(--border)' : 'none' }}
                     >
                       <div>
-                        <h3 style={{margin: 0, marginBottom: '0.5rem'}}>{item.name}</h3>
-                        <p style={{margin: 0, color: 'var(--gray-600)'}}>${item.current_price}</p>
+                        <h3 style={{ margin: 0, marginBottom: '0.5rem' }}>{item.name}</h3>
+                        <p style={{ margin: 0, color: 'var(--gray-600)' }}>₹{item.current_price}</p>
                       </div>
-                      <AnimatedButton 
+                      <AnimatedButton
                         onClick={() => handleRemoveFromCart(item.id)}
                         variant="outline"
                         size="sm"
@@ -495,11 +495,11 @@ function App() {
                   ))}
                 </div>
 
-                <div style={{background: 'white', borderRadius: '12px', padding: '2rem', boxShadow: 'var(--shadow-md)'}}>
-                  <div style={{fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '1.5rem', textAlign: 'center'}}>
-                    Total: ${cartTotal.toFixed(2)}
+                <div style={{ background: 'white', borderRadius: '12px', padding: '2rem', boxShadow: 'var(--shadow-md)' }}>
+                  <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '1.5rem', textAlign: 'center' }}>
+                    Total: ₹{cartTotal.toFixed(2)}
                   </div>
-                  <AnimatedButton 
+                  <AnimatedButton
                     onClick={() => {
                       if (!authToken) {
                         showAlert('Please login to checkout', 'error');
@@ -507,10 +507,10 @@ function App() {
                         return;
                       }
                       setCurrentPage('checkout');
-                    }} 
-                    variant="primary" 
-                    size="lg" 
-                    style={{width: '100%', justifyContent: 'center'}}
+                    }}
+                    variant="primary"
+                    size="lg"
+                    style={{ width: '100%', justifyContent: 'center' }}
                   >
                     💳 Proceed to Checkout
                   </AnimatedButton>

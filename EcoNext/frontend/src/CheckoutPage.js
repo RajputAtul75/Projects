@@ -16,7 +16,7 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
     zipcode: '',
     country: '',
   });
-  
+
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(false);
@@ -39,14 +39,14 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
     if (!formData.state.trim()) newErrors.state = 'State is required';
     if (!formData.zipcode.trim()) newErrors.zipcode = 'Zipcode is required';
     if (!formData.country.trim()) newErrors.country = 'Country is required';
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -62,7 +62,7 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
       };
 
       const response = await apiService.createOrder(shippingData, authToken);
-      
+
       if (response.status === 'success') {
         setOrderPlaced(true);
         if (onOrderSuccess) {
@@ -371,7 +371,7 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
           }}
         >
           <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Order Summary</h2>
-          
+
           <div style={{ marginBottom: '1.5rem', maxHeight: '300px', overflowY: 'auto' }}>
             {cart.map((item) => (
               <div
@@ -389,7 +389,7 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
                   <p style={{ margin: 0, fontSize: '0.85rem', color: '#999' }}>Qty: {item.quantity}</p>
                 </div>
                 <p style={{ margin: 0, fontWeight: '600', color: '#10B981' }}>
-                  ${(item.current_price * item.quantity).toFixed(2)}
+                  ₹{(item.current_price * item.quantity).toFixed(2)}
                 </p>
               </div>
             ))}
@@ -405,7 +405,7 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
             color: '#10B981'
           }}>
             <span>Total:</span>
-            <span>${cartTotal.toFixed(2)}</span>
+            <span>₹{cartTotal.toFixed(2)}</span>
           </div>
         </motion.div>
       </div>
