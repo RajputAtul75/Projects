@@ -9,7 +9,7 @@ from products.serializers import (
     ProductSerializer, PricePredictionSerializer, SearchResultSerializer,
     CategorySerializer, PriceHistorySerializer
 )
-from ml_engine.price_predictor import PricePredictor
+from ml_engine.price_predictor import PricePredictor, PricePredictionService
 from ml_engine.intent_search import IntentBasedSearcher
 from ml_engine.visual_search import VisualSearchEngine
 from ml_engine.models import PricePrediction
@@ -46,7 +46,7 @@ def product_list(request):
 
 @api_view(['GET'])
 def product_detail(request, product_id):
-    """Get single product with price prediction"""
+    """Get single product with live price prediction"""
     try:
         product = get_object_or_404(Product, id=product_id)
         
@@ -58,23 +58,16 @@ def product_detail(request, product_id):
                 product=product
             )
         
-        # Get latest price prediction
-        prediction = PricePrediction.objects.filter(product=product).latest('prediction_date')
-        prediction_serializer = PricePredictionSerializer(prediction)
+        # Compute live prediction
+        service = PricePredictionService()
+        prediction_data = service.predict(product, use_cache=True)
         
         product_serializer = ProductSerializer(product)
         
         return Response({
             'status': 'success',
             'product': product_serializer.data,
-            'price_prediction': prediction_serializer.data
-        })
-    except PricePrediction.DoesNotExist:
-        product_serializer = ProductSerializer(product)
-        return Response({
-            'status': 'success',
-            'product': product_serializer.data,
-            'price_prediction': None
+            'price_prediction': prediction_data
         })
     except Exception as e:
         return Response(
@@ -150,24 +143,17 @@ def category_browse(request):
 
 @api_view(['GET'])
 def price_prediction(request, product_id):
-    """Get 7-day price prediction for product"""
+    """Get 7-day price prediction for product — computed live with caching."""
     try:
         product = get_object_or_404(Product, id=product_id)
-        
-        # Try to get existing prediction
-        prediction = PricePrediction.objects.filter(product=product).latest('prediction_date')
-        
-        serializer = PricePredictionSerializer(prediction)
-        
+
+        service = PricePredictionService()
+        result = service.predict(product, use_cache=True)
+
         return Response({
             'status': 'success',
-            'prediction': serializer.data
+            'prediction': result
         })
-    except PricePrediction.DoesNotExist:
-        return Response(
-            {'error': 'No prediction available yet', 'prediction': None},
-            status=status.HTTP_404_NOT_FOUND
-        )
     except Exception as e:
         return Response(
             {'error': str(e)},

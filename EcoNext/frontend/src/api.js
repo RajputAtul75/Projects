@@ -3,6 +3,13 @@
 
 const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
+const handleResponse = async (res) => {
+  if (!res.ok && res.status >= 500) {
+    throw new Error(`Server error: ${res.status}`);
+  }
+  return res.json();
+};
+
 export const apiService = {
   // Authentication
   signup(userData) {
@@ -11,7 +18,7 @@ export const apiService = {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(userData)
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   login(credentials) {
@@ -20,7 +27,7 @@ export const apiService = {
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(credentials)
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   logout() {
@@ -28,14 +35,14 @@ export const apiService = {
       method: 'POST',
       headers: {'Authorization': `Bearer ${localStorage.getItem('authToken')}`}
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   getCurrentUser() {
     return fetch(`${API_BASE_URL}/auth/current-user/`, {
       headers: {'Authorization': `Bearer ${localStorage.getItem('authToken')}`}
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   updateProfile(profileData) {
@@ -47,24 +54,24 @@ export const apiService = {
       },
       body: JSON.stringify(profileData)
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   // Products
   getProducts(page = 1, perPage = 12) {
     return fetch(`${API_BASE_URL}/products/?page=${page}&per_page=${perPage}`)
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   getProductDetail(productId) {
     return fetch(`${API_BASE_URL}/products/${productId}/`)
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   // Search
   intentSearch(query) {
     return fetch(`${API_BASE_URL}/products/search/intent/?q=${encodeURIComponent(query)}`)
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   visualSearch(imageFile) {
@@ -75,19 +82,19 @@ export const apiService = {
       method: 'POST',
       body: formData
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   // Price Prediction
   getPricePrediction(productId) {
     return fetch(`${API_BASE_URL}/products/${productId}/prediction/`)
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   // Trending
   getTrendingProducts() {
     return fetch(`${API_BASE_URL}/products/trending/`)
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   // Cart (Authentication required)
@@ -95,7 +102,7 @@ export const apiService = {
     return fetch(`${API_BASE_URL}/cart/`, {
       headers: {'Authorization': `Bearer ${authToken}`}
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   addToCart(productId, quantity, authToken) {
@@ -107,7 +114,7 @@ export const apiService = {
       },
       body: JSON.stringify({product_id: productId, quantity})
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   updateCartItem(itemId, quantity, authToken) {
@@ -119,7 +126,7 @@ export const apiService = {
       },
       body: JSON.stringify({quantity})
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   removeFromCart(itemId, authToken) {
@@ -127,7 +134,7 @@ export const apiService = {
       method: 'DELETE',
       headers: {'Authorization': `Bearer ${authToken}`}
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   clearCart(authToken) {
@@ -135,7 +142,7 @@ export const apiService = {
       method: 'DELETE',
       headers: {'Authorization': `Bearer ${authToken}`}
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   // Orders
@@ -148,20 +155,20 @@ export const apiService = {
       },
       body: JSON.stringify({shipping: shippingData})
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   getOrders(authToken) {
     return fetch(`${API_BASE_URL}/orders/`, {
       headers: {'Authorization': `Bearer ${authToken}`}
     })
-      .then(res => res.json());
+      .then(handleResponse);
   },
 
   getOrderDetail(orderId, authToken) {
     return fetch(`${API_BASE_URL}/orders/${orderId}/`, {
       headers: {'Authorization': `Bearer ${authToken}`}
     })
-      .then(res => res.json());
+      .then(handleResponse);
   }
 };

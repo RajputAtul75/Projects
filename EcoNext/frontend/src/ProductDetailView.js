@@ -2,88 +2,67 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ShoppingCart, AlertCircle } from 'lucide-react';
 import { apiService } from './api';
-import { AnimatedButton, Skeleton, PricePredictorCard } from './components';
+import { AnimatedButton, PricePredictorCard } from './components';
 
 export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
   const [product, setProduct] = useState(null);
   const [prediction, setPrediction] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [imageLoaded, setImageLoaded] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const loadProduct = async () => {
+      setLoading(true);
+      setError(null);
       try {
         const data = await apiService.getProductDetail(productId);
         if (data.status === 'success') {
           setProduct(data.product);
           setPrediction(data.price_prediction);
+        } else {
+          setError('Failed to load product');
         }
-      } catch (error) {
-        console.error('Error loading product:', error);
+      } catch (err) {
+        console.error('Error loading product:', err);
+        setError('Failed to load product');
       }
       setLoading(false);
     };
     loadProduct();
   }, [productId]);
 
-  const containerVariants = {
-    initial: { opacity: 0 },
-    animate: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.2,
-      },
-    },
-  };
-
-  const itemVariants = {
-    initial: { opacity: 0, y: 20 },
-    animate: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4 },
-    },
-  };
-
   if (loading) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-      >
-        <Skeleton count={1} variant="card" />
-      </motion.div>
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div className="loading"></div>
+        <p>Loading product...</p>
+      </div>
     );
   }
 
-  if (!product) {
+  if (error || !product) {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="empty-state"
-      >
+      <div className="empty-state" style={{ padding: '3rem', textAlign: 'center' }}>
         <AlertCircle size={64} style={{ marginBottom: '1rem', opacity: 0.5 }} />
         <h2>Product not found</h2>
-        <p>The product you're looking for doesn't exist or has been removed.</p>
+        <p>{error || "The product you're looking for doesn't exist or has been removed."}</p>
         <AnimatedButton onClick={onBack} variant="primary">
           <ChevronLeft size={20} />
           Go Back
         </AnimatedButton>
-      </motion.div>
+      </div>
     );
   }
 
   return (
     <motion.div
       className="product-detail"
-      variants={containerVariants}
-      initial="initial"
-      animate="animate"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
     >
       {/* Back Button */}
-      <motion.div variants={itemVariants}>
+      <div style={{ marginBottom: '1.5rem' }}>
         <AnimatedButton
           onClick={onBack}
           variant="outline"
@@ -92,114 +71,86 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
           <ChevronLeft size={18} />
           Back
         </AnimatedButton>
-      </motion.div>
+      </div>
 
       {/* Main Content */}
-      <motion.div
-        className="product-detail-grid"
-        variants={itemVariants}
-      >
+      <div className="product-detail-grid">
         {/* Image */}
-        <motion.div
-          className="product-detail-image"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4 }}
-        >
+        <div className="product-detail-image">
           {product.image_url ? (
-            <>
-              <motion.img
-                src={product.image_url}
-                alt={product.name}
-                onLoad={() => setImageLoaded(true)}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: imageLoaded ? 1 : 0 }}
-              />
-              {!imageLoaded && <Skeleton width="100%" height="400px" />}
-            </>
+            <img
+              src={product.image_url}
+              alt={product.name}
+              style={{ width: '100%', height: 'auto', borderRadius: '12px', display: 'block' }}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
           ) : (
             <div className="no-image">No Image Available</div>
           )}
-        </motion.div>
+        </div>
 
         {/* Details */}
-        <motion.div className="product-detail-content">
+        <div className="product-detail-content">
           {/* Title */}
-          <motion.h1 variants={itemVariants}>
-            {product.name}
-          </motion.h1>
+          <h1>{product.name}</h1>
 
           {/* Category */}
-          <motion.p
-            className="product-category-text"
-            variants={itemVariants}
-          >
+          <p className="product-category-text">
             {product.category?.name || 'Uncategorized'}
-          </motion.p>
+          </p>
 
           {/* Price */}
-          <motion.div
-            className="price-section"
-            variants={itemVariants}
-          >
-            <motion.div
-              className="current-price"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              ₹{product.current_price ? Number(product.current_price).toFixed(2) : '0.00'}
-            </motion.div>
-            {product.original_price && Number(product.original_price) > Number(product.current_price) && (
-              <motion.span
-                className="original-price"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
-              >
-                ₹{Number(product.original_price).toFixed(2)}
-              </motion.span>
-            )}
-          </motion.div>
+          <div className="price-section">
+            <div className="current-price">
+              ₹{product.current_price ? Number(product.current_price).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
+            </div>
+          </div>
 
           {/* Price Predictor Component */}
           {prediction && (
-            <motion.div variants={itemVariants}>
-              <PricePredictorCard
-                prediction={prediction}
-                currentPrice={product.current_price}
-              />
-            </motion.div>
+            <PricePredictorCard
+              prediction={prediction}
+              currentPrice={product.current_price}
+            />
           )}
 
           {/* Description */}
           {product.description && (
-            <motion.div
-              className="description-section"
-              variants={itemVariants}
-            >
+            <div className="description-section">
               <h3>Description</h3>
               <p>{product.description}</p>
-            </motion.div>
+            </div>
           )}
 
           {/* Stock Status */}
-          {product.stock_quantity !== undefined && (
-            <motion.div
-              className="stock-section"
-              variants={itemVariants}
-            >
-              <span className={`stock-badge ${product.stock_quantity > 0 ? 'in-stock' : 'out-of-stock'}`}>
-                {product.stock_quantity > 0 ? `✓ In Stock (${product.stock_quantity})` : 'Out of Stock'}
+          {product.stock !== undefined && (
+            <div className="stock-section">
+              <span className={`stock-badge ${product.stock > 0 ? 'in-stock' : 'out-of-stock'}`}>
+                {product.stock > 0 ? `✓ In Stock (${product.stock})` : 'Out of Stock'}
               </span>
-            </motion.div>
+            </div>
+          )}
+
+          {/* Tags */}
+          {product.tags && product.tags.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {product.tags.map((tag, idx) => (
+                <span key={idx} style={{
+                  background: '#E8F5E9',
+                  color: '#2E7D32',
+                  padding: '4px 12px',
+                  borderRadius: '20px',
+                  fontSize: '0.85rem',
+                  fontWeight: '500'
+                }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
           )}
 
           {/* Actions */}
-          <motion.div
-            className="action-buttons"
-            variants={itemVariants}
-          >
+          <div className="action-buttons" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
             <AnimatedButton
               onClick={() => onAddToCart(product)}
               variant="primary"
@@ -215,9 +166,9 @@ export const ProductDetailView = ({ productId, onAddToCart, onBack }) => {
             >
               Continue Shopping
             </AnimatedButton>
-          </motion.div>
-        </motion.div>
-      </motion.div>
+          </div>
+        </div>
+      </div>
     </motion.div>
   );
 };

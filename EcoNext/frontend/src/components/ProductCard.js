@@ -108,7 +108,7 @@ export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
             animate={{ scale: 1 }}
             transition={{ delay: 0.2 }}
           >
-            ₹{product.price ? Number(product.price).toFixed(2) : '0.00'}
+            ₹{product.current_price ? Number(product.current_price).toFixed(2) : (product.price ? Number(product.price).toFixed(2) : '0.00')}
           </motion.div>
           {product.originalPrice && (
             <motion.span

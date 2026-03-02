@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './modern-styles.css';
 import './App.css';
 import { apiService } from './api';
@@ -10,15 +10,75 @@ import ProfilePage from './ProfilePage';
 import {
   AnimatedButton,
   ProductCard,
-  HeroSection,
-  Modal,
-  Skeleton
+  HeroSection
 } from './components';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Leaf } from 'lucide-react';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('home');
+  // Navigation history system
+  const [pageHistory, setPageHistory] = useState(['home']);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const currentPage = pageHistory[historyIndex];
+
+  const navigateTo = useCallback((page) => {
+    if (page === pageHistory[historyIndex]) return; // Don't navigate to same page
+    setPageHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1);
+      newHistory.push(page);
+      return newHistory;
+    });
+    setHistoryIndex(prev => prev + 1);
+    window.history.pushState({ page }, '', `#${page}`);
+    window.scrollTo(0, 0);
+  }, [historyIndex, pageHistory]);
+
+  const goBack = useCallback(() => {
+    if (historyIndex > 0) {
+      setHistoryIndex(prev => prev - 1);
+      window.history.back();
+      window.scrollTo(0, 0);
+    } else {
+      navigateTo('home');
+    }
+  }, [historyIndex, navigateTo]);
+
+  const goForward = useCallback(() => {
+    if (historyIndex < pageHistory.length - 1) {
+      setHistoryIndex(prev => prev + 1);
+      window.history.forward();
+      window.scrollTo(0, 0);
+    }
+  }, [historyIndex, pageHistory.length]);
+
+  const canGoBack = historyIndex > 0;
+  const canGoForward = historyIndex < pageHistory.length - 1;
+
+  // Set initial browser state on mount only
+  useEffect(() => {
+    window.history.replaceState({ page: 'home' }, '', '#home');
+  }, []);
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (e.state && e.state.page) {
+        const page = e.state.page;
+        const idx = pageHistory.lastIndexOf(page);
+        if (idx !== -1) {
+          setHistoryIndex(idx);
+        }
+      } else {
+        // Browser back with no state - go to previous in our history
+        setHistoryIndex(prev => Math.max(0, prev - 1));
+      }
+      window.scrollTo(0, 0);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [pageHistory]);
+
   const [products, setProducts] = useState([]);
   const [searchResults, setSearchResults] = useState(null);
   const [cart, setCart] = useState([]);
@@ -35,6 +95,7 @@ function App() {
     loadProducts();
     loadTrendingProducts();
     checkUserSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-rotate carousel every 5 seconds
@@ -59,14 +120,14 @@ function App() {
   const handleLoginSuccess = (response) => {
     setUser(response.user);
     setAuthToken(response.tokens.access);
-    setCurrentPage('home');
+    navigateTo('home');
     showAlert('Welcome! You are now logged in.', 'success');
   };
 
   const handleSignupSuccess = (response) => {
     setUser(response.user);
     setAuthToken(response.tokens.access);
-    setCurrentPage('home');
+    navigateTo('home');
     showAlert('Welcome to EcoNext! Your account has been created.', 'success');
   };
 
@@ -77,7 +138,7 @@ function App() {
     setUser(null);
     setAuthToken(null);
     setCart([]);
-    setCurrentPage('home');
+    navigateTo('home');
     showAlert('You have been logged out.', 'success');
   };
 
@@ -122,7 +183,7 @@ function App() {
       const data = await apiService.intentSearch(query);
       if (data.status === 'success') {
         setSearchResults(data.results);
-        setCurrentPage('search');
+        navigateTo('search');
       }
     } catch (error) {
       showAlert('Search failed: ' + error.message, 'error');
@@ -163,7 +224,7 @@ function App() {
       {/* Header */}
       <header>
         <nav>
-          <div className="logo" onClick={() => setCurrentPage('home')} style={{ cursor: 'pointer' }}>
+          <div className="logo" onClick={() => navigateTo('home')} style={{ cursor: 'pointer' }}>
             <Leaf size={24} style={{ display: 'inline-block', marginRight: '8px' }} />
             EcoNext
           </div>
@@ -178,19 +239,19 @@ function App() {
           </form>
 
           <ul className="nav-menu">
-            <li><a onClick={() => setCurrentPage('home')}>Home</a></li>
-            <li><a onClick={() => setCurrentPage('trending')}>Trending</a></li>
-            <li><a onClick={() => setCurrentPage('cart')}>🛒 Cart ({cart.length})</a></li>
+            <li><a href="#home" onClick={(e) => { e.preventDefault(); navigateTo('home'); }}>Home</a></li>
+            <li><a href="#trending" onClick={(e) => { e.preventDefault(); navigateTo('trending'); }}>Trending</a></li>
+            <li><a href="#cart" onClick={(e) => { e.preventDefault(); navigateTo('cart'); }}>🛒 Cart ({cart.length})</a></li>
 
             {user ? (
               <>
-                <li><a onClick={() => setCurrentPage('profile')}>👤 {user.username}</a></li>
-                <li><a onClick={handleLogout} style={{ color: '#EF4444' }}>Logout</a></li>
+                <li><a href="#profile" onClick={(e) => { e.preventDefault(); navigateTo('profile'); }}>👤 {user.username}</a></li>
+                <li><a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }} style={{ color: '#EF4444' }}>Logout</a></li>
               </>
             ) : (
               <>
-                <li><a onClick={() => setCurrentPage('login')}>Login</a></li>
-                <li><a onClick={() => setCurrentPage('signup')}>Sign up</a></li>
+                <li><a href="#login" onClick={(e) => { e.preventDefault(); navigateTo('login'); }}>Login</a></li>
+                <li><a href="#signup" onClick={(e) => { e.preventDefault(); navigateTo('signup'); }}>Sign up</a></li>
               </>
             )}
           </ul>
@@ -215,14 +276,14 @@ function App() {
         {currentPage === 'login' && (
           <LoginPage
             onLoginSuccess={handleLoginSuccess}
-            onSwitchPage={setCurrentPage}
+            onSwitchPage={navigateTo}
           />
         )}
 
         {currentPage === 'signup' && (
           <SignupPage
             onSignupSuccess={handleSignupSuccess}
-            onSwitchPage={setCurrentPage}
+            onSwitchPage={navigateTo}
           />
         )}
 
@@ -235,6 +296,18 @@ function App() {
                 productsSection.scrollIntoView({ behavior: 'smooth' });
               }
             }} />
+
+            {/* Navigation Back/Forward Bar */}
+            {(canGoBack || canGoForward) && (
+              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                <AnimatedButton onClick={goBack} variant="outline" size="sm" style={{ opacity: canGoBack ? 1 : 0.4, pointerEvents: canGoBack ? 'auto' : 'none' }}>
+                  <ChevronLeft size={16} /> Back
+                </AnimatedButton>
+                <AnimatedButton onClick={goForward} variant="outline" size="sm" style={{ opacity: canGoForward ? 1 : 0.4, pointerEvents: canGoForward ? 'auto' : 'none' }}>
+                  Forward <ChevronRight size={16} />
+                </AnimatedButton>
+              </div>
+            )}
 
             {/* Featured Carousel */}
             {featuredProducts.length > 0 && (
@@ -268,7 +341,7 @@ function App() {
                           Add to Cart
                         </AnimatedButton>
                         <AnimatedButton
-                          onClick={() => setCurrentPage(`product-${featuredProducts[carouselIndex].id}`)}
+                          onClick={() => navigateTo(`product-${featuredProducts[carouselIndex].id}`)}
                           variant="outline"
                         >
                           View Details
@@ -308,7 +381,7 @@ function App() {
               >
                 <div className="section-header">
                   <h2>🔥 Trending Now</h2>
-                  <a className="view-all" onClick={() => setCurrentPage('trending')}>View All</a>
+                  <a className="view-all" onClick={() => navigateTo('trending')}>View All</a>
                 </div>
                 <div className="product-grid">
                   {trendingProducts.slice(0, 8).map((item, idx) => (
@@ -321,7 +394,7 @@ function App() {
                       <ProductCard
                         product={item.product}
                         onAddCart={handleAddToCart}
-                        onViewDetails={() => setCurrentPage(`product-${item.product.id}`)}
+                        onViewDetails={() => navigateTo(`product-${item.product.id}`)}
                       />
                     </motion.div>
                   ))}
@@ -352,7 +425,7 @@ function App() {
                       <ProductCard
                         product={product}
                         onAddCart={handleAddToCart}
-                        onViewDetails={() => setCurrentPage(`product-${product.id}`)}
+                        onViewDetails={() => navigateTo(`product-${product.id}`)}
                       />
                     </motion.div>
                   ))}
@@ -374,11 +447,11 @@ function App() {
         )}
 
         {/* Product Detail Page */}
-        {currentPage.startsWith('product-') && !loading && (
+        {currentPage && currentPage.startsWith('product-') && (
           <ProductDetailView
             productId={parseInt(currentPage.split('-')[1])}
             onAddToCart={handleAddToCart}
-            onBack={() => setCurrentPage('home')}
+            onBack={goBack}
           />
         )}
 
@@ -388,9 +461,16 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <AnimatedButton onClick={() => setCurrentPage('home')} variant="outline">
-              ← Back
-            </AnimatedButton>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <AnimatedButton onClick={goBack} variant="outline" size="sm">
+                <ChevronLeft size={16} /> Back
+              </AnimatedButton>
+              {canGoForward && (
+                <AnimatedButton onClick={goForward} variant="outline" size="sm">
+                  Forward <ChevronRight size={16} />
+                </AnimatedButton>
+              )}
+            </div>
             <h2 style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>Search Results</h2>
             {Object.entries(searchResults).map(([category, items]) => (
               <motion.div
@@ -406,7 +486,7 @@ function App() {
                       key={item.product.id}
                       product={item.product}
                       onAddCart={handleAddToCart}
-                      onViewDetails={() => setCurrentPage(`product-${item.product.id}`)}
+                      onViewDetails={() => navigateTo(`product-${item.product.id}`)}
                     />
                   ))}
                 </div>
@@ -421,9 +501,16 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <AnimatedButton onClick={() => setCurrentPage('home')} variant="outline">
-              ← Back
-            </AnimatedButton>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <AnimatedButton onClick={goBack} variant="outline" size="sm">
+                <ChevronLeft size={16} /> Back
+              </AnimatedButton>
+              {canGoForward && (
+                <AnimatedButton onClick={goForward} variant="outline" size="sm">
+                  Forward <ChevronRight size={16} />
+                </AnimatedButton>
+              )}
+            </div>
             <h2 style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>🔥 Trending Products</h2>
             <div className="product-grid">
               {trendingProducts.map((item, idx) => (
@@ -436,7 +523,7 @@ function App() {
                   <ProductCard
                     product={item.product}
                     onAddCart={handleAddToCart}
-                    onViewDetails={() => setCurrentPage(`product-${item.product.id}`)}
+                    onViewDetails={() => navigateTo(`product-${item.product.id}`)}
                   />
                 </motion.div>
               ))}
@@ -450,9 +537,16 @@ function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
-            <AnimatedButton onClick={() => setCurrentPage('home')} variant="outline">
-              ← Continue Shopping
-            </AnimatedButton>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <AnimatedButton onClick={goBack} variant="outline" size="sm">
+                <ChevronLeft size={16} /> Back
+              </AnimatedButton>
+              {canGoForward && (
+                <AnimatedButton onClick={goForward} variant="outline" size="sm">
+                  Forward <ChevronRight size={16} />
+                </AnimatedButton>
+              )}
+            </div>
             <h2 style={{ marginTop: '2rem', marginBottom: '1.5rem' }}>🛒 Shopping Cart</h2>
             {cart.length === 0 ? (
               <motion.div
@@ -462,7 +556,7 @@ function App() {
               >
                 <p style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛒</p>
                 <p>Your cart is empty</p>
-                <AnimatedButton onClick={() => setCurrentPage('home')} variant="primary" style={{ marginTop: '1rem' }}>
+                <AnimatedButton onClick={() => navigateTo('home')} variant="primary" style={{ marginTop: '1rem' }}>
                   Continue Shopping
                 </AnimatedButton>
               </motion.div>
@@ -503,10 +597,10 @@ function App() {
                     onClick={() => {
                       if (!authToken) {
                         showAlert('Please login to checkout', 'error');
-                        setCurrentPage('login');
+                        navigateTo('login');
                         return;
                       }
-                      setCurrentPage('checkout');
+                      navigateTo('checkout');
                     }}
                     variant="primary"
                     size="lg"
@@ -524,11 +618,11 @@ function App() {
         {currentPage === 'checkout' && (
           <CheckoutPage
             cart={cart}
-            onBack={() => setCurrentPage('cart')}
+            onBack={goBack}
             onOrderSuccess={(order) => {
               setCart([]);
               showAlert('Order placed successfully!', 'success');
-              setTimeout(() => setCurrentPage('home'), 2000);
+              setTimeout(() => navigateTo('home'), 2000);
             }}
             authToken={authToken}
           />
@@ -539,7 +633,7 @@ function App() {
           <ProfilePage
             user={user}
             authToken={authToken}
-            onBack={() => setCurrentPage('home')}
+            onBack={goBack}
           />
         )}
       </div>
