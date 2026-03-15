@@ -53,6 +53,19 @@
   background: linear-gradient(135deg, #da190b 0%, #ba0001 100%);
 }
 
+.icon {
+  background: transparent;
+  border: 1px solid #ccc;
+  padding: 0.5rem;
+  border-radius: 50%;
+  color: #555;
+}
+
+.icon:hover:not(:disabled) {
+  background: #f0f0f0;
+  color: #333;
+}
+
 /* Sizes */
 .sm {
   padding: 0.5rem 1rem;

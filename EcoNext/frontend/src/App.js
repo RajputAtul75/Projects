@@ -13,7 +13,13 @@ import {
   HeroSection
 } from './components';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Leaf } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Leaf,
+  Camera
+} from 'lucide-react';
+import VisualSearch from './VisualSearch';
 
 function App() {
   // Navigation history system
@@ -236,6 +242,27 @@ function App() {
               placeholder="Search eco-friendly products..."
             />
             <button type="submit">Search</button>
+            <button
+              type="button"
+              onClick={() => navigateTo('visual-search')}
+              style={{
+                marginLeft: '0.5rem',
+                background: 'none',
+                border: '1px solid #ccc',
+                padding: '0.5rem',
+                borderRadius: '50%',
+                color: '#555',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '40px',
+                height: '40px'
+              }}
+              title="Visual Search"
+            >
+              <Camera size={20} />
+            </button>
           </form>
 
           <ul className="nav-menu">
@@ -246,7 +273,15 @@ function App() {
             {user ? (
               <>
                 <li><a href="#profile" onClick={(e) => { e.preventDefault(); navigateTo('profile'); }}>👤 {user.username}</a></li>
-                <li><a href="#" onClick={(e) => { e.preventDefault(); handleLogout(); }} style={{ color: '#EF4444' }}>Logout</a></li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    style={{ color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}
+                  >
+                    Logout
+                  </button>
+                </li>
               </>
             ) : (
               <>
@@ -284,6 +319,13 @@ function App() {
           <SignupPage
             onSignupSuccess={handleSignupSuccess}
             onSwitchPage={navigateTo}
+          />
+        )}
+
+        {currentPage === 'visual-search' && (
+          <VisualSearch
+            onBack={goBack}
+            onProductClick={(productId) => navigateTo(`product-${productId}`)}
           />
         )}
 
@@ -381,7 +423,14 @@ function App() {
               >
                 <div className="section-header">
                   <h2>🔥 Trending Now</h2>
-                  <a className="view-all" onClick={() => navigateTo('trending')}>View All</a>
+                  <button
+                    type="button"
+                    className="view-all"
+                    onClick={() => navigateTo('trending')}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
+                  >
+                    View All
+                  </button>
                 </div>
                 <div className="product-grid">
                   {trendingProducts.slice(0, 8).map((item, idx) => (
@@ -634,6 +683,14 @@ function App() {
             user={user}
             authToken={authToken}
             onBack={goBack}
+          />
+        )}
+
+        {/* Visual Search Page */}
+        {currentPage === 'visual-search' && (
+          <VisualSearch
+            onBack={goBack}
+            onProductClick={(productId) => navigateTo(`product-${productId}`)}
           />
         )}
       </div>

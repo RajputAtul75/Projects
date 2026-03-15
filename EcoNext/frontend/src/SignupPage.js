@@ -391,7 +391,13 @@ function SignupPage({ onSignupSuccess, onSwitchPage }) {
           <div className="form-footer">
             <p>
               Already have an account?{' '}
-              <a onClick={() => onSwitchPage('login')}>Sign in here</a>
+              <button
+                type="button"
+                onClick={() => onSwitchPage('login')}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', textDecoration: 'underline', font: 'inherit' }}
+              >
+                Sign in here
+              </button>
             </p>
           </div>
         </motion.div>

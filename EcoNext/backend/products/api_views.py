@@ -10,7 +10,7 @@ from products.serializers import (
     CategorySerializer, PriceHistorySerializer
 )
 from ml_engine.price_predictor import PricePredictor, PricePredictionService
-from ml_engine.intent_search import IntentBasedSearcher
+from ml_engine.views import visual_search_view as visual_search
 from ml_engine.visual_search import VisualSearchEngine
 from ml_engine.models import PricePrediction
 from accounts.models import ActivityLog

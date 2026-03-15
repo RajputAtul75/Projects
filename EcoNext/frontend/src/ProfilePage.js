@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, AlertCircle, Check } from 'lucide-react';
+import { ChevronLeft, Check } from 'lucide-react';
 import { apiService } from './api';
 import { AnimatedButton } from './components';
 
@@ -21,12 +21,7 @@ export const ProfilePage = ({ user, authToken, onBack }) => {
   });
   const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    loadProfile();
-    loadOrders();
-  }, []);
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       const data = await apiService.getCurrentUser();
       if (data.status === 'success') {
@@ -44,9 +39,9 @@ export const ProfilePage = ({ user, authToken, onBack }) => {
       console.error('Error loading profile:', error);
     }
     setLoading(false);
-  };
+  }, []);
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       const data = await apiService.getOrders(authToken);
       if (data.status === 'success') {
@@ -55,7 +50,12 @@ export const ProfilePage = ({ user, authToken, onBack }) => {
     } catch (error) {
       console.error('Error loading orders:', error);
     }
-  };
+  }, [authToken]);
+
+  useEffect(() => {
+    loadProfile();
+    loadOrders();
+  }, [loadProfile, loadOrders]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

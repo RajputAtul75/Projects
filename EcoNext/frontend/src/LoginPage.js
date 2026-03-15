@@ -137,7 +137,14 @@ function LoginPage({ onLoginSuccess, onSwitchPage }) {
             <div className="form-group">
               <div className="label-row">
                 <label htmlFor="password">Password</label>
-                <a href="#" className="forgot-password">Forgot password?</a>
+                <button
+                  type="button"
+                  className="forgot-password"
+                  onClick={() => onSwitchPage('signup')}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
+                >
+                  Forgot password?
+                </button>
               </div>
               <div className="input-wrapper">
                 <Lock className="input-icon" size={18} />
@@ -198,7 +205,13 @@ function LoginPage({ onLoginSuccess, onSwitchPage }) {
           <div className="form-footer">
             <p>
               Don't have an account?{' '}
-              <a onClick={() => onSwitchPage('signup')}>Create one now</a>
+              <button
+                type="button"
+                onClick={() => onSwitchPage('signup')}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit', textDecoration: 'underline', font: 'inherit' }}
+              >
+                Create one now
+              </button>
             </p>
           </div>
         </motion.div>
