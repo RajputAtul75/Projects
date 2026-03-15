@@ -1,0 +1,25 @@
+/// API endpoint constants
+class ApiConstants {
+  ApiConstants._();
+
+  /// Base URL — change this to your deployed backend
+  static const String baseUrl = 'https://api.heatintelligence.io';
+
+  /// Endpoints
+  static const String heatRisk = '/api/heat-risk';
+  static const String heatZones = '/api/heat-zones';
+  static const String heatHistory = '/api/heat-history';
+  static const String heatPrediction = '/api/heat-prediction';
+  static const String alerts = '/api/alerts';
+
+  /// Timeouts (ms)
+  static const int connectTimeout = 15000;
+  static const int receiveTimeout = 15000;
+
+  /// Headers
+  static Map<String, String> get defaultHeaders => {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-App-Version': '1.0.0',
+      };
+}
