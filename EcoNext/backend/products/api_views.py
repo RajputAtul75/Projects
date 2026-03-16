@@ -10,8 +10,7 @@ from products.serializers import (
     CategorySerializer, PriceHistorySerializer
 )
 from ml_engine.price_predictor import PricePredictor, PricePredictionService
-from ml_engine.views import visual_search_view as visual_search
-from ml_engine.visual_search import VisualSearchEngine
+from ml_engine.visual_search import visual_search_engine
 from ml_engine.models import PricePrediction
 from accounts.models import ActivityLog
 import json
@@ -164,34 +163,25 @@ def price_prediction(request, product_id):
 @api_view(['POST'])
 def visual_search(request):
     """Search by image upload"""
+    if 'image' not in request.FILES:
+        return Response(
+            {'status': 'error', 'message': 'Image file not provided.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    image_file = request.FILES['image']
+
     try:
-        if 'image' not in request.FILES:
-            return Response(
-                {'error': 'Image file required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Use the instantiated engine to find similar products
+        similar_products = visual_search_engine.search(image_file, top_k=10)
         
-        image_file = request.FILES['image']
-        
-        # Extract features
-        engine = VisualSearchEngine()
-        features = engine.process_image_from_upload(image_file)
-        
-        if features is None:
-            return Response(
-                {'error': 'Could not process image'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Find similar products
-        similar_products = engine.find_similar_products(features, top_k=10)
-        
+        # Serialize the results
         results = [
             {
-                'product': ProductSerializer(product).data,
-                'similarity_score': float(score)
+                'product': ProductSerializer(item['product']).data,
+                'similarity_score': float(item['similarity_score'])
             }
-            for product, score in similar_products
+            for item in similar_products
         ]
         
         return Response({
@@ -201,8 +191,8 @@ def visual_search(request):
         })
     except Exception as e:
         return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
+            {'status': 'error', 'message': f'An error occurred: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 
