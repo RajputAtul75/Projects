@@ -1,0 +1,11 @@
+.widget {
+    padding: 32px 24px;
+    background-color: #f8f9fa;
+}
+
+.title {
+    font-size: 2rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 24px;
+}

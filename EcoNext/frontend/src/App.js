@@ -20,6 +20,13 @@ import {
   Camera
 } from 'lucide-react';
 import VisualSearch from './VisualSearch';
+import KidsPage from './pages/KidsPage';
+import TeensPage from './pages/TeensPage';
+import MenPage from './pages/MenPage';
+import WomenPage from './pages/WomenPage';
+import UnisexPage from './pages/UnisexPage';
+import PreferenceForm from './components/personalization/PreferenceForm';
+import RecommendationWidget from './components/personalization/RecommendationWidget';
 
 function App() {
   // Navigation history system
@@ -268,6 +275,12 @@ function App() {
           <ul className="nav-menu">
             <li><a href="#home" onClick={(e) => { e.preventDefault(); navigateTo('home'); }}>Home</a></li>
             <li><a href="#trending" onClick={(e) => { e.preventDefault(); navigateTo('trending'); }}>Trending</a></li>
+            <li><a href="#kids" onClick={(e) => { e.preventDefault(); navigateTo('kids'); }}>Kids</a></li>
+            <li><a href="#teens" onClick={(e) => { e.preventDefault(); navigateTo('teens'); }}>Teens</a></li>
+            <li><a href="#men" onClick={(e) => { e.preventDefault(); navigateTo('men'); }}>Men</a></li>
+            <li><a href="#women" onClick={(e) => { e.preventDefault(); navigateTo('women'); }}>Women</a></li>
+            <li><a href="#unisex" onClick={(e) => { e.preventDefault(); navigateTo('unisex'); }}>Unisex</a></li>
+            <li><a href="#preferences" onClick={(e) => { e.preventDefault(); navigateTo('preferences'); }}>Preferences</a></li>
             <li><a href="#cart" onClick={(e) => { e.preventDefault(); navigateTo('cart'); }}>🛒 Cart ({cart.length})</a></li>
 
             {user ? (
@@ -350,6 +363,40 @@ function App() {
                 </AnimatedButton>
               </div>
             )}
+
+            {/* Personalized Section */}
+            {authToken && <RecommendationWidget />}
+
+            {/* Segment Landing Shortcuts */}
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              style={{
+                marginBottom: '2rem',
+                padding: '1rem',
+                background: 'linear-gradient(135deg, #eefbf3 0%, #e9f5ff 100%)',
+                borderRadius: '14px'
+              }}
+            >
+              <div className="section-header">
+                <h2>Shop By Segment</h2>
+                <span style={{ color: 'var(--gray-600)' }}>Tailored eco picks for every persona</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem' }}>
+                {[
+                  { key: 'kids', label: 'EcoNext Kids' },
+                  { key: 'teens', label: 'EcoNext Teens' },
+                  { key: 'men', label: 'EcoNext Men' },
+                  { key: 'women', label: 'EcoNext Women' },
+                  { key: 'unisex', label: 'EcoNext Unisex' },
+                ].map((item) => (
+                  <AnimatedButton key={item.key} onClick={() => navigateTo(item.key)} variant="secondary" size="sm" style={{ justifyContent: 'center' }}>
+                    {item.label}
+                  </AnimatedButton>
+                ))}
+              </div>
+            </motion.div>
 
             {/* Featured Carousel */}
             {featuredProducts.length > 0 && (
@@ -493,6 +540,45 @@ function App() {
               </motion.div>
             )}
           </>
+        )}
+
+        {currentPage === 'kids' && (
+          <KidsPage
+            onViewDetails={(productId) => navigateTo(`product-${productId}`)}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+
+        {currentPage === 'teens' && (
+          <TeensPage
+            onViewDetails={(productId) => navigateTo(`product-${productId}`)}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+
+        {currentPage === 'men' && (
+          <MenPage
+            onViewDetails={(productId) => navigateTo(`product-${productId}`)}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+
+        {currentPage === 'women' && (
+          <WomenPage
+            onViewDetails={(productId) => navigateTo(`product-${productId}`)}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+
+        {currentPage === 'unisex' && (
+          <UnisexPage
+            onViewDetails={(productId) => navigateTo(`product-${productId}`)}
+            onAddToCart={handleAddToCart}
+          />
+        )}
+
+        {currentPage === 'preferences' && (
+          <PreferenceForm />
         )}
 
         {/* Product Detail Page */}

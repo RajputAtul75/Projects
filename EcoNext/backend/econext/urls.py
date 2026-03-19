@@ -26,6 +26,7 @@ urlpatterns = [
     # API endpoints
     path('api/', include('accounts.urls')),
     path('api/products/', include('products.urls')),
+    path('api/personalization/', include('personalization.urls')),
     
     # Cart endpoints
     path('api/cart/', cart_views.get_cart, name='get_cart'),

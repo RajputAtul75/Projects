@@ -11,12 +11,76 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
 
 
+from rest_framework import serializers
+from products.models import (
+    Product, Category, PriceHistory, ProductSearch,
+    SubCategory, AgeGroup, GenderCategory, EcoTag, SkinOrBodyFit, Season, Occasion
+)
+from accounts.models import UserProfile, ActivityLog
+from shop_cart.models import Cart, CartItem
+from order_service.models import Order, OrderItem
+from ml_engine.models import PricePrediction
+
+class AgeGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AgeGroup
+        fields = '__all__'
+
+class GenderCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GenderCategory
+        fields = '__all__'
+
+class SubCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SubCategory
+        fields = '__all__'
+
+class EcoTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EcoTag
+        fields = '__all__'
+
+class SkinOrBodyFitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SkinOrBodyFit
+        fields = '__all__'
+
+class SeasonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Season
+        fields = '__all__'
+
+class OccasionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Occasion
+        fields = '__all__'
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'description']
+
+
 class ProductSerializer(serializers.ModelSerializer):
     category = CategorySerializer()
-    
+    subcategory = SubCategorySerializer()
+    age_groups = AgeGroupSerializer(many=True)
+    gender_categories = GenderCategorySerializer(many=True)
+    eco_tags = EcoTagSerializer(many=True)
+    skin_or_body_fit = SkinOrBodyFitSerializer()
+    season = SeasonSerializer()
+    occasion = OccasionSerializer()
+
     class Meta:
         model = Product
-        fields = ['id', 'name', 'description', 'category', 'current_price', 'image_url', 'stock', 'tags', 'created_at']
+        fields = [
+            'id', 'name', 'description', 'category', 'subcategory', 'current_price', 
+            'image_url', 'stock', 'tags', 'created_at', 'age_groups', 
+            'gender_categories', 'eco_tags', 'skin_or_body_fit', 'season', 
+            'occasion', 'popularity_score', 'sustainability_score'
+        ]
 
 
 class PriceHistorySerializer(serializers.ModelSerializer):

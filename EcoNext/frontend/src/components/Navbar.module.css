@@ -1,0 +1,49 @@
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 32px;
+    background-color: #fff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+}
+
+.brand {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #007bff;
+    text-decoration: none;
+}
+
+.links {
+    display: flex;
+    gap: 24px;
+}
+
+.link {
+    text-decoration: none;
+    color: #555;
+    font-weight: 600;
+    transition: color 0.3s ease;
+}
+
+.link:hover {
+    color: #007bff;
+}
+
+.auth {
+    display: flex;
+    gap: 16px;
+}
+
+.signup {
+    background-color: #007bff;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    transition: background-color 0.3s ease;
+}
+
+.signup:hover {
+    background-color: #0056b3;
+    color: #fff;
+}

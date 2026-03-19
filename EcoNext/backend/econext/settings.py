@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'order_service',
     'site_analytics',
     'ml_engine',
+    'personalization',
 
     'corsheaders',
     'rest_framework',

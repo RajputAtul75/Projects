@@ -1,0 +1,36 @@
+.page {
+    display: flex;
+    flex-direction: column;
+}
+
+.header {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: #fff;
+    padding: 48px 24px;
+    text-align: center;
+}
+
+.title {
+    font-size: 3rem;
+    font-weight: 800;
+    margin: 0;
+}
+
+.subtitle {
+    font-size: 1.2rem;
+    margin-top: 8px;
+}
+
+.content {
+    display: flex;
+    padding: 24px;
+}
+
+.sidebar {
+    flex: 0 0 280px;
+    margin-right: 24px;
+}
+
+.main {
+    flex: 1;
+}

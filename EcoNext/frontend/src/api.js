@@ -58,14 +58,92 @@ export const apiService = {
   },
 
   // Products
-  getProducts(page = 1, perPage = 12) {
-    return fetch(`${API_BASE_URL}/products/?page=${page}&per_page=${perPage}`)
+  getProducts(arg1 = 1, arg2 = 12) {
+    let query = '';
+
+    if (typeof arg1 === 'object' && arg1 !== null) {
+      const params = new URLSearchParams();
+      Object.entries(arg1).forEach(([key, value]) => {
+        if (value === undefined || value === null || value === '') return;
+        if (Array.isArray(value)) {
+          value.forEach((item) => params.append(key, item));
+        } else {
+          params.append(key, value);
+        }
+      });
+      query = params.toString();
+    } else {
+      query = new URLSearchParams({ page: arg1, per_page: arg2 }).toString();
+    }
+
+    return fetch(`${API_BASE_URL}/products/?${query}`)
       .then(handleResponse);
   },
 
   getProductDetail(productId) {
     return fetch(`${API_BASE_URL}/products/${productId}/`)
       .then(handleResponse);
+  },
+
+  // Personalization
+  getAgeGroups() {
+    return fetch(`${API_BASE_URL}/products/age-groups/`).then(handleResponse);
+  },
+
+  getGenderCategories() {
+    return fetch(`${API_BASE_URL}/products/gender-categories/`).then(handleResponse);
+  },
+
+  async getCategories() {
+    const response = await fetch(`${API_BASE_URL}/products/categories/`).then(handleResponse);
+    if (Array.isArray(response)) {
+      return response;
+    }
+    if (response?.categories && typeof response.categories === 'object') {
+      return Object.keys(response.categories).map((name, idx) => ({ id: idx + 1, name }));
+    }
+    return [];
+  },
+
+  getEcoTags() {
+    return fetch(`${API_BASE_URL}/products/eco-tags/`).then(handleResponse);
+  },
+
+  getRecommendations() {
+    return fetch(`${API_BASE_URL}/products/recommendations/`, {
+        headers: {'Authorization': `Bearer ${localStorage.getItem('authToken')}`}
+    }).then(handleResponse);
+  },
+
+  getUserPreferences() {
+    return fetch(`${API_BASE_URL}/personalization/preferences/`, {
+        headers: {'Authorization': `Bearer ${localStorage.getItem('authToken')}`}
+    }).then(handleResponse);
+  },
+
+  async updateUserPreferences(preferences) {
+    const token = localStorage.getItem('authToken');
+    const existing = await this.getUserPreferences();
+
+    if (Array.isArray(existing) && existing.length > 0) {
+      return fetch(`${API_BASE_URL}/personalization/preferences/${existing[0].id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(preferences)
+      }).then(handleResponse);
+    }
+
+    return fetch(`${API_BASE_URL}/personalization/preferences/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(preferences)
+    }).then(handleResponse);
   },
 
   // Search
