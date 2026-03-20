@@ -67,7 +67,7 @@ class DashboardScreen extends ConsumerWidget {
                       padding: EdgeInsets.all(20),
                       child: LoadingWidget(height: 220),
                     ),
-                    error: (_, __) => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
                     data: (history) =>
                         _buildTrendChart(context, history, isDark),
                   ),
@@ -459,7 +459,7 @@ class DashboardScreen extends ConsumerWidget {
                       ),
                       dotData: FlDotData(
                         show: true,
-                        getDotPainter: (spot, _, __, ___) =>
+                        getDotPainter: (spot, _, _, _) =>
                             FlDotCirclePainter(
                           radius: 4,
                           color: AppColors.getRiskColor(

@@ -48,12 +48,10 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
                   target: userLatLng,
                   zoom: 13.5,
                 ),
+                style: isDark ? _darkMapStyle : null,
                 onMapCreated: (controller) {
                   if (!_mapController.isCompleted) {
                     _mapController.complete(controller);
-                  }
-                  if (isDark) {
-                    controller.setMapStyle(_darkMapStyle);
                   }
                 },
                 mapType: _mapType,
@@ -64,12 +62,12 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
                 circles: zonesAsync.when(
                   data: (zones) => _buildCircles(zones),
                   loading: () => {},
-                  error: (_, __) => {},
+                  error: (_, _) => {},
                 ),
                 markers: zonesAsync.when(
                   data: (zones) => _buildMarkers(zones),
                   loading: () => {},
-                  error: (_, __) => {},
+                  error: (_, _) => {},
                 ),
               ),
 
@@ -102,7 +100,7 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
                       )
                     : const SizedBox.shrink(),
                 loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
               ),
             ],
           );

@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:dio/dio.dart';
 import '../constants/api_constants.dart';
 import '../models/heat_data.dart';
@@ -19,7 +21,7 @@ class ApiService {
     _dio.interceptors.add(LogInterceptor(
       requestBody: true,
       responseBody: true,
-      logPrint: (obj) => print('[API] $obj'),
+      logPrint: (obj) => developer.log('$obj', name: 'API'),
     ));
   }
 
