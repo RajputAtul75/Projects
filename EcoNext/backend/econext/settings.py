@@ -43,9 +43,12 @@ INSTALLED_APPS = [
     'site_analytics',
     'ml_engine',
     'personalization',
+    'kids_products',
+    'copilot',
 
     'corsheaders',
     'rest_framework',
+    'django_filters',
 
     'django.contrib.admin',
     'django.contrib.auth',
@@ -189,4 +192,7 @@ CACHES = {
         }
     }
 }
+
+# AI Copilot settings
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 

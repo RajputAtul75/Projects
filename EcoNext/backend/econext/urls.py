@@ -18,6 +18,8 @@ from django.contrib import admin
 from django.urls import path, include
 from products.views import welcome
 from shop_cart import api_views as cart_views
+from personalization.views import UserPreferenceViewSet
+from kids_products.views import KidsProductViewSet
 
 urlpatterns = [
     path('', welcome, name='welcome'),
@@ -26,7 +28,27 @@ urlpatterns = [
     # API endpoints
     path('api/', include('accounts.urls')),
     path('api/products/', include('products.urls')),
-    path('api/personalization/', include('personalization.urls')),
+    path('api/copilot/', include('copilot.urls')),
+    path(
+        'api/personalization/preferences/',
+        UserPreferenceViewSet.as_view({'get': 'list', 'post': 'create'}),
+        name='userpreference-list'
+    ),
+    path(
+        'api/personalization/preferences/<int:pk>/',
+        UserPreferenceViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update', 'put': 'update', 'delete': 'destroy'}),
+        name='userpreference-detail'
+    ),
+    path(
+        'api/kids/products/',
+        KidsProductViewSet.as_view({'get': 'list'}),
+        name='kidsproduct-list'
+    ),
+    path(
+        'api/kids/products/<int:pk>/',
+        KidsProductViewSet.as_view({'get': 'retrieve'}),
+        name='kidsproduct-detail'
+    ),
     
     # Cart endpoints
     path('api/cart/', cart_views.get_cart, name='get_cart'),

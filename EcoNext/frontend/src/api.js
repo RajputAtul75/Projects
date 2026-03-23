@@ -248,5 +248,14 @@ export const apiService = {
       headers: {'Authorization': `Bearer ${authToken}`}
     })
       .then(handleResponse);
+  },
+
+  copilotRecommend(query) {
+    return fetch(`${API_BASE_URL}/copilot/`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ query })
+    })
+      .then(handleResponse);
   }
 };
