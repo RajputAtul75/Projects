@@ -250,12 +250,16 @@ export const apiService = {
       .then(handleResponse);
   },
 
-  copilotRecommend(query) {
+  ecoAiRecommend(query) {
     return fetch(`${API_BASE_URL}/copilot/`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ query })
     })
       .then(handleResponse);
+  },
+
+  copilotRecommend(query) {
+    return this.ecoAiRecommend(query);
   }
 };

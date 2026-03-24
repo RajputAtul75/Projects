@@ -16,13 +16,13 @@ const normalizeForCard = (item) => ({
   current_price: item.current_price ?? item.price,
 });
 
-const CopilotPage = ({ onViewDetails, onAddToCart }) => {
+const EcoAiPage = ({ onViewDetails, onAddToCart }) => {
   const [query, setQuery] = useState(starterPrompts[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
 
-  const runCopilot = async (value) => {
+  const runEcoAi = async (value) => {
     const q = (value ?? query).trim();
     if (!q) {
       setError('Please enter a shopping query.');
@@ -32,7 +32,7 @@ const CopilotPage = ({ onViewDetails, onAddToCart }) => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiService.copilotRecommend(q);
+      const data = await apiService.ecoAiRecommend(q);
       setResult(data);
     } catch (err) {
       setError(err?.message || 'Failed to get recommendations.');
@@ -50,17 +50,17 @@ const CopilotPage = ({ onViewDetails, onAddToCart }) => {
       >
         <div className={styles.titleRow}>
           <WandSparkles size={26} />
-          <h1>Personal AI Shopping Copilot</h1>
+          <h1>Personal AI Shopping EcoAi</h1>
         </div>
         <p>
-          Ask in natural language. Copilot will extract intent, optimize by budget and relevance, and recommend products or a full setup.
+          Ask in natural language. EcoAi will extract intent, optimize by budget and relevance, and recommend products or a full setup.
         </p>
       </motion.div>
 
       <div className={styles.queryCard}>
-        <label htmlFor="copilot-query">Your Query</label>
+        <label htmlFor="ecoai-query">Your Query</label>
         <textarea
-          id="copilot-query"
+          id="ecoai-query"
           rows={3}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -75,7 +75,7 @@ const CopilotPage = ({ onViewDetails, onAddToCart }) => {
               className={styles.promptChip}
               onClick={() => {
                 setQuery(p);
-                runCopilot(p);
+                runEcoAi(p);
               }}
             >
               {p}
@@ -83,7 +83,7 @@ const CopilotPage = ({ onViewDetails, onAddToCart }) => {
           ))}
         </div>
 
-        <button type="button" className={styles.submitBtn} onClick={() => runCopilot(query)} disabled={loading}>
+        <button type="button" className={styles.submitBtn} onClick={() => runEcoAi(query)} disabled={loading}>
           {loading ? <Loader2 className={styles.spin} size={18} /> : 'Get Recommendations'}
         </button>
 
@@ -102,7 +102,7 @@ const CopilotPage = ({ onViewDetails, onAddToCart }) => {
               <pre>{JSON.stringify(result.structured_query || {}, null, 2)}</pre>
             </div>
             <div className={styles.panel}>
-              <h3>Copilot Response</h3>
+              <h3>EcoAi Response</h3>
               <p>{result.ai_response}</p>
               <span className={styles.badge}>Type: {result.recommendation_type || 'single'}</span>
             </div>
@@ -135,4 +135,4 @@ const CopilotPage = ({ onViewDetails, onAddToCart }) => {
   );
 };
 
-export default CopilotPage;
+export default EcoAiPage;
