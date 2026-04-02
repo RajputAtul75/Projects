@@ -10,4 +10,6 @@ void main(){
 //2. StateFullWidgest
 //3. InheritedWidgets
 
-class MyApp extends StatelessWidget{}
+class MyApp extends StatelessWidget{
+  const MyApp({super.key});
+}
