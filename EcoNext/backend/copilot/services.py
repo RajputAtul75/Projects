@@ -45,8 +45,10 @@ def _fallback_parse_query(query: str) -> StructuredQuery:
     if budget_match:
         raw = budget_match.group(1) or budget_match.group(2)
         budget = int(raw.replace(",", ""))
-
-    lowered = query.lower()
+if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable not set")
+    model = os.getenv("AI_MODEL") or "gpt-4o-mini"
+    api_url =
     category = None
     for candidate in ["pc", "laptop", "skincare", "phone", "monitor", "keyboard", "mouse"]:
         if candidate in lowered:
