@@ -45,7 +45,7 @@ const VisualSearch = ({ onBack, onProductClick }) => {
           setError('No similar products found. Try a different image.');
         }
       } else {
-        setError(response.message || 'Search failed. Please try again.');
+        setError(response.message || response.detail || 'Search failed. Please try again.');
       }
     } catch (err) {
       setError('An unexpected error occurred during the search.');

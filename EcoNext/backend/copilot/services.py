@@ -48,7 +48,7 @@ def _fallback_parse_query(query: str) -> StructuredQuery:
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable not set")
     model = os.getenv("AI_MODEL") or "gpt-4o-mini"
-    api_url = os.getenv("AI_API_URL") or OPENAI_API_URL os.getenv("AI_API_URL") or OPENAI_API_URL
+    api_url = os.getenv("AI_API_URL") or "https://api.openai.com/v1/chat/completions"
     category = None
     for candidate in ["pc", "laptop", "skincare", "phone", "monitor", "keyboard", "mouse"]:
         if candidate in lowered:

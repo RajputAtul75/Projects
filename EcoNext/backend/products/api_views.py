@@ -1,6 +1,7 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from datetime import timedelta
@@ -276,6 +277,7 @@ def price_prediction(request, product_id):
 
 
 @api_view(['POST'])
+@permission_classes([AllowAny])
 def visual_search(request):
     """Search by image upload"""
     if 'image' not in request.FILES:

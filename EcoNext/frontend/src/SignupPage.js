@@ -86,10 +86,24 @@ function SignupPage({ onSignupSuccess, onSwitchPage }) {
         localStorage.setItem('user', JSON.stringify(response.user));
         onSignupSuccess(response);
       } else {
-        setErrors(response.errors || { general: 'Signup failed' });
+        const apiErrors = response.errors || {};
+        const normalizedErrors = Object.entries(apiErrors).reduce((acc, [key, value]) => {
+          acc[key] = Array.isArray(value) ? value[0] : value;
+          return acc;
+        }, {});
+
+        if (!normalizedErrors.general) {
+          normalizedErrors.general = response.message || 'Signup failed';
+        }
+
+        if (normalizedErrors.username || normalizedErrors.email) {
+          setCurrentStep(1);
+        }
+
+        setErrors(normalizedErrors);
       }
     } catch (err) {
-      setErrors({ general: 'An error occurred during signup' });
+      setErrors({ general: err.message || 'An error occurred during signup' });
     } finally {
       setLoading(false);
     }

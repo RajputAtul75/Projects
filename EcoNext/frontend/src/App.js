@@ -781,13 +781,6 @@ function App() {
           />
         )}
 
-        {/* Visual Search Page */}
-        {currentPage === 'visual-search' && (
-          <VisualSearch
-            onBack={goBack}
-            onProductClick={(productId) => navigateTo(`product-${productId}`)}
-          />
-        )}
       </div>
     </div>
   );
