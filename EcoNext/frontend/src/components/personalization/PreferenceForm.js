@@ -16,6 +16,11 @@ const PreferenceForm = () => {
     const [categories, setCategories] = useState([]);
     const [ecoTags, setEcoTags] = useState([]);
 
+    const safeAgeGroups = Array.isArray(ageGroups) ? ageGroups : [];
+    const safeGenderCategories = Array.isArray(genderCategories) ? genderCategories : [];
+    const safeCategories = Array.isArray(categories) ? categories : [];
+    const safeEcoTags = Array.isArray(ecoTags) ? ecoTags : [];
+
     useEffect(() => {
         const fetchData = async () => {
             const [userPrefs, ageGroupsData, genderCatsData, catsData, ecoTagsData] = await Promise.all([
@@ -25,13 +30,13 @@ const PreferenceForm = () => {
                 apiService.getCategories(),
                 apiService.getEcoTags(),
             ]);
-            if (userPrefs && userPrefs.length > 0) {
+            if (Array.isArray(userPrefs) && userPrefs.length > 0) {
                 setPreferences(userPrefs[0]);
             }
-            setAgeGroups(ageGroupsData);
-            setGenderCategories(genderCatsData);
-            setCategories(catsData);
-            setEcoTags(ecoTagsData);
+            setAgeGroups(Array.isArray(ageGroupsData) ? ageGroupsData : []);
+            setGenderCategories(Array.isArray(genderCatsData) ? genderCatsData : []);
+            setCategories(Array.isArray(catsData) ? catsData : []);
+            setEcoTags(Array.isArray(ecoTagsData) ? ecoTagsData : []);
         };
         fetchData();
     }, []);
@@ -67,7 +72,7 @@ const PreferenceForm = () => {
                     <label>Your Age Group</label>
                     <select name="age_group" value={preferences.age_group} onChange={handleInputChange}>
                         <option value="">Select...</option>
-                        {ageGroups.map(ag => <option key={ag.id} value={ag.id}>{ag.name}</option>)}
+                        {safeAgeGroups.map(ag => <option key={ag.id} value={ag.id}>{ag.name}</option>)}
                     </select>
                 </div>
 
@@ -76,7 +81,7 @@ const PreferenceForm = () => {
                     <label>Preferred Gender Category</label>
                     <select name="gender_category" value={preferences.gender_category} onChange={handleInputChange}>
                         <option value="">Select...</option>
-                        {genderCategories.map(gc => <option key={gc.id} value={gc.id}>{gc.name}</option>)}
+                        {safeGenderCategories.map(gc => <option key={gc.id} value={gc.id}>{gc.name}</option>)}
                     </select>
                 </div>
 
@@ -84,7 +89,7 @@ const PreferenceForm = () => {
                 <div className={styles.formGroup}>
                     <label>Favorite Categories (Ctrl+Click to select multiple)</label>
                     <select multiple name="preferred_categories" value={preferences.preferred_categories} onChange={(e) => handleMultiSelectChange(e, 'preferred_categories')} className={styles.multiSelect}>
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        {safeCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                 </div>
 
@@ -101,7 +106,7 @@ const PreferenceForm = () => {
                 <div className={styles.formGroup}>
                     <label>Eco-Friendly Preferences (Ctrl+Click to select multiple)</label>
                     <select multiple name="eco_preferences" value={preferences.eco_preferences} onChange={(e) => handleMultiSelectChange(e, 'eco_preferences')} className={styles.multiSelect}>
-                        {ecoTags.map(tag => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+                        {safeEcoTags.map(tag => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
                     </select>
                 </div>
 

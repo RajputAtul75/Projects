@@ -122,6 +122,13 @@ function App() {
     }
   }, [featuredProducts]);
 
+  // Keep selected slide index valid if featured products are refreshed.
+  useEffect(() => {
+    if (featuredProducts.length > 0) {
+      setCarouselIndex((prev) => prev % featuredProducts.length);
+    }
+  }, [featuredProducts.length]);
+
   const checkUserSession = () => {
     const token = localStorage.getItem('authToken');
     const savedUser = localStorage.getItem('user');
@@ -232,6 +239,10 @@ function App() {
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + (parseFloat(item.current_price) * item.quantity), 0);
+  const safeCarouselIndex = featuredProducts.length > 0
+    ? carouselIndex % featuredProducts.length
+    : 0;
+  const featuredProduct = featuredProducts[safeCarouselIndex];
 
   return (
     <div className="App">
@@ -410,29 +421,29 @@ function App() {
               >
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={carouselIndex}
+                    key={safeCarouselIndex}
                     className="carousel-slide"
                     initial={{ opacity: 0, x: 100 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -100 }}
                     transition={{ duration: 0.5 }}
                     style={{
-                      background: `linear-gradient(135deg, ${['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'][carouselIndex % 5]} 0%, ${['#059669', '#1E40AF', '#D97706', '#DC2626', '#7C3AED'][carouselIndex % 5]} 100%)`
+                      background: `linear-gradient(135deg, ${['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'][safeCarouselIndex % 5]} 0%, ${['#059669', '#1E40AF', '#D97706', '#DC2626', '#7C3AED'][safeCarouselIndex % 5]} 100%)`
                     }}
                   >
                     <div className="carousel-content">
                       <h2>Featured Product</h2>
-                      <h3 style={{ color: 'white', marginBottom: '1rem' }}>{featuredProducts[carouselIndex].name}</h3>
-                      <p style={{ color: 'rgba(255,255,255,0.9)' }}>{featuredProducts[carouselIndex].description}</p>
+                      <h3 style={{ color: 'white', marginBottom: '1rem' }}>{featuredProduct.name}</h3>
+                      <p style={{ color: 'rgba(255,255,255,0.9)' }}>{featuredProduct.description}</p>
                       <div style={{ display: 'flex', gap: '1rem' }}>
                         <AnimatedButton
-                          onClick={() => handleAddToCart(featuredProducts[carouselIndex])}
+                          onClick={() => handleAddToCart(featuredProduct)}
                           variant="primary"
                         >
                           Add to Cart
                         </AnimatedButton>
                         <AnimatedButton
-                          onClick={() => navigateTo(`product-${featuredProducts[carouselIndex].id}`)}
+                          onClick={() => navigateTo(`product-${featuredProduct.id}`)}
                           variant="outline"
                         >
                           View Details
@@ -440,8 +451,8 @@ function App() {
                       </div>
                     </div>
                     <img
-                      src="https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=500&h=300&fit=crop"
-                      alt="Featured"
+                      src={featuredProduct.image_url || 'https://via.placeholder.com/500x300?text=Featured+Product'}
+                      alt={featuredProduct.name}
                       className="carousel-image"
                     />
                   </motion.div>
@@ -452,7 +463,7 @@ function App() {
                   {featuredProducts.map((_, idx) => (
                     <motion.div
                       key={idx}
-                      className={`carousel-dot ${idx === carouselIndex ? 'active' : ''}`}
+                      className={`carousel-dot ${idx === safeCarouselIndex ? 'active' : ''}`}
                       onClick={() => setCarouselIndex(idx)}
                       whileHover={{ scale: 1.2 }}
                       whileTap={{ scale: 0.9 }}

@@ -10,6 +10,13 @@ const handleResponse = async (res) => {
   return res.json();
 };
 
+const normalizeListResponse = (response) => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.results)) return response.results;
+  if (Array.isArray(response?.data)) return response.data;
+  return [];
+};
+
 export const apiService = {
   // Authentication
   signup(userData) {
@@ -87,11 +94,15 @@ export const apiService = {
 
   // Personalization
   getAgeGroups() {
-    return fetch(`${API_BASE_URL}/products/age-groups/`).then(handleResponse);
+    return fetch(`${API_BASE_URL}/products/age-groups/`)
+      .then(handleResponse)
+      .then(normalizeListResponse);
   },
 
   getGenderCategories() {
-    return fetch(`${API_BASE_URL}/products/gender-categories/`).then(handleResponse);
+    return fetch(`${API_BASE_URL}/products/gender-categories/`)
+      .then(handleResponse)
+      .then(normalizeListResponse);
   },
 
   async getCategories() {
@@ -106,7 +117,9 @@ export const apiService = {
   },
 
   getEcoTags() {
-    return fetch(`${API_BASE_URL}/products/eco-tags/`).then(handleResponse);
+    return fetch(`${API_BASE_URL}/products/eco-tags/`)
+      .then(handleResponse)
+      .then(normalizeListResponse);
   },
 
   getRecommendations() {
@@ -118,7 +131,9 @@ export const apiService = {
   getUserPreferences() {
     return fetch(`${API_BASE_URL}/personalization/preferences/`, {
         headers: {'Authorization': `Bearer ${localStorage.getItem('authToken')}`}
-    }).then(handleResponse);
+    })
+      .then(handleResponse)
+      .then(normalizeListResponse);
   },
 
   async updateUserPreferences(preferences) {

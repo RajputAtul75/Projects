@@ -12,6 +12,7 @@ from products.serializers import (
 )
 from ml_engine.price_predictor import PricePredictor, PricePredictionService
 from ml_engine.visual_search import visual_search_engine
+from ml_engine.intent_search import IntentBasedSearcher
 from ml_engine.models import PricePrediction
 from accounts.models import ActivityLog
 import json
