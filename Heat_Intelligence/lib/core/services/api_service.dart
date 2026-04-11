@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import '../constants/api_constants.dart';
 import '../models/heat_data.dart';
 import '../models/heat_zone.dart';
+import '../utils/heat_risk_calculator.dart';
 
 /// HTTP API service for communicating with the HDI backend
 class ApiService {
@@ -30,6 +31,22 @@ class ApiService {
     required double lat,
     required double lng,
   }) async {
+    if (ApiConstants.hasWeatherApiKey) {
+      try {
+        return await _fetchRealtimeHeatRisk(lat: lat, lng: lng);
+      } on DioException catch (e) {
+        developer.log(
+          'OpenWeather fetch failed (${e.type}), falling back to backend',
+          name: 'API',
+        );
+      } catch (e) {
+        developer.log(
+          'OpenWeather parse failed ($e), falling back to backend',
+          name: 'API',
+        );
+      }
+    }
+
     try {
       final response = await _dio.get(
         ApiConstants.heatRisk,
@@ -40,6 +57,62 @@ class ApiService {
       // Return dummy data for offline / development
       return HeatData.dummy(lat: lat, lng: lng);
     }
+  }
+
+  Future<HeatData> _fetchRealtimeHeatRisk({
+    required double lat,
+    required double lng,
+  }) async {
+    final response = await _dio.get(
+      '${ApiConstants.weatherBaseUrl}${ApiConstants.weatherCurrent}',
+      queryParameters: {
+        'lat': lat,
+        'lon': lng,
+        'appid': ApiConstants.weatherApiKey,
+        'units': 'metric',
+      },
+    );
+
+    final data = response.data as Map<String, dynamic>;
+    final main = data['main'] as Map<String, dynamic>?;
+    final wind = data['wind'] as Map<String, dynamic>?;
+
+    final temp = (main?['temp'] as num?)?.toDouble();
+    final humidity = (main?['humidity'] as num?)?.toDouble();
+
+    if (temp == null || humidity == null) {
+      throw const FormatException('Missing temperature or humidity in response');
+    }
+
+    final windSpeed = (wind?['speed'] as num?)?.toDouble();
+    final heatIndex = HeatRiskCalculator.calculateHeatIndex(
+      temperatureC: temp,
+      humidityPercent: humidity,
+    );
+    final riskScore = HeatRiskCalculator.calculateRiskScore(
+      temperature: temp,
+      humidity: humidity,
+      windSpeed: windSpeed,
+    );
+
+    final unixTime = (data['dt'] as num?)?.toInt();
+    final timestamp = unixTime == null
+        ? DateTime.now()
+        : DateTime.fromMillisecondsSinceEpoch(unixTime * 1000, isUtc: true)
+            .toLocal();
+
+    return HeatData(
+      latitude: lat,
+      longitude: lng,
+      temperature: temp,
+      heatIndex: heatIndex,
+      humidity: humidity,
+      riskScore: riskScore,
+      locationName: data['name'] as String? ?? 'Current Location',
+      timestamp: timestamp,
+      windSpeed: windSpeed,
+      uvIndex: null,
+    );
   }
 
   /// Fetch heat zones near the user

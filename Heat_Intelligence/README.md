@@ -8,6 +8,19 @@ Heat Intelligence is a Flutter app for monitoring heat risk, alerts, and map-bas
 2. From the project root, run `flutter pub get`.
 3. Configure your Google Maps API key (required for map rendering).
 
+### Weather API key (real-time weather)
+
+The app supports real-time weather from OpenWeather when a weather API key is
+provided at build/run time.
+
+Run with:
+
+```bash
+flutter run -d emulator-5554 --dart-define=WEATHER_API_KEY=your_openweather_api_key
+```
+
+If no key is provided, the app falls back to backend or local dummy data.
+
 ### Android API key
 
 Set one of these:
