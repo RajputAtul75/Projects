@@ -1,4 +1,5 @@
 import 'dart:developer' as developer;
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import '../constants/api_constants.dart';
@@ -31,20 +32,18 @@ class ApiService {
     required double lat,
     required double lng,
   }) async {
-    if (ApiConstants.hasWeatherApiKey) {
-      try {
-        return await _fetchRealtimeHeatRisk(lat: lat, lng: lng);
-      } on DioException catch (e) {
-        developer.log(
-          'OpenWeather fetch failed (${e.type}), falling back to backend',
-          name: 'API',
-        );
-      } catch (e) {
-        developer.log(
-          'OpenWeather parse failed ($e), falling back to backend',
-          name: 'API',
-        );
-      }
+    try {
+      return await _fetchRealtimeHeatRisk(lat: lat, lng: lng);
+    } on DioException catch (e) {
+      developer.log(
+        'Open-Meteo fetch failed (${e.type}), falling back to backend',
+        name: 'API',
+      );
+    } catch (e) {
+      developer.log(
+        'Open-Meteo parse failed ($e), falling back to backend',
+        name: 'API',
+      );
     }
 
     try {
@@ -67,24 +66,23 @@ class ApiService {
       '${ApiConstants.weatherBaseUrl}${ApiConstants.weatherCurrent}',
       queryParameters: {
         'lat': lat,
-        'lon': lng,
-        'appid': ApiConstants.weatherApiKey,
-        'units': 'metric',
+        'longitude': lng,
+        'current': 'temperature_2m,relative_humidity_2m,wind_speed_10m',
+        'timezone': 'auto',
       },
     );
 
     final data = response.data as Map<String, dynamic>;
-    final main = data['main'] as Map<String, dynamic>?;
-    final wind = data['wind'] as Map<String, dynamic>?;
+    final current = data['current'] as Map<String, dynamic>?;
 
-    final temp = (main?['temp'] as num?)?.toDouble();
-    final humidity = (main?['humidity'] as num?)?.toDouble();
+    final temp = (current?['temperature_2m'] as num?)?.toDouble();
+    final humidity = (current?['relative_humidity_2m'] as num?)?.toDouble();
 
     if (temp == null || humidity == null) {
       throw const FormatException('Missing temperature or humidity in response');
     }
 
-    final windSpeed = (wind?['speed'] as num?)?.toDouble();
+    final windSpeed = (current?['wind_speed_10m'] as num?)?.toDouble();
     final heatIndex = HeatRiskCalculator.calculateHeatIndex(
       temperatureC: temp,
       humidityPercent: humidity,
@@ -95,11 +93,11 @@ class ApiService {
       windSpeed: windSpeed,
     );
 
-    final unixTime = (data['dt'] as num?)?.toInt();
-    final timestamp = unixTime == null
-        ? DateTime.now()
-        : DateTime.fromMillisecondsSinceEpoch(unixTime * 1000, isUtc: true)
-            .toLocal();
+    final timeIso = current?['time'] as String?;
+    final timestamp =
+        timeIso == null ? DateTime.now() : DateTime.tryParse(timeIso)?.toLocal() ?? DateTime.now();
+
+    final cityLabel = _resolveLocationLabel(data);
 
     return HeatData(
       latitude: lat,
@@ -108,11 +106,22 @@ class ApiService {
       heatIndex: heatIndex,
       humidity: humidity,
       riskScore: riskScore,
-      locationName: data['name'] as String? ?? 'Current Location',
+      locationName: cityLabel,
       timestamp: timestamp,
       windSpeed: windSpeed,
       uvIndex: null,
     );
+  }
+
+  String _resolveLocationLabel(Map<String, dynamic> response) {
+    final timezone = response['timezone'] as String?;
+    if (timezone == null || timezone.trim().isEmpty) {
+      return 'Current Location';
+    }
+
+    final parts = timezone.split('/');
+    final label = parts.isEmpty ? timezone : parts.last;
+    return label.replaceAll('_', ' ');
   }
 
   /// Fetch heat zones near the user
@@ -121,6 +130,24 @@ class ApiService {
     required double lng,
     double radiusKm = 10,
   }) async {
+    try {
+      return await _fetchRealtimeHeatZones(
+        lat: lat,
+        lng: lng,
+        radiusKm: radiusKm,
+      );
+    } on DioException catch (e) {
+      developer.log(
+        'Open-Meteo zones fetch failed (${e.type}), falling back to backend',
+        name: 'API',
+      );
+    } catch (e) {
+      developer.log(
+        'Open-Meteo zones parse failed ($e), falling back to backend',
+        name: 'API',
+      );
+    }
+
     try {
       final response = await _dio.get(
         ApiConstants.heatZones,
@@ -133,6 +160,72 @@ class ApiService {
     } on DioException catch (_) {
       return HeatZone.dummyZones(lat, lng);
     }
+  }
+
+  Future<List<HeatZone>> _fetchRealtimeHeatZones({
+    required double lat,
+    required double lng,
+    required double radiusKm,
+  }) async {
+    final samplePoints = _buildZoneSamplePoints(
+      centerLat: lat,
+      centerLng: lng,
+      radiusKm: radiusKm,
+    );
+
+    final samples = await Future.wait(
+      samplePoints.map((point) {
+        return _fetchRealtimeHeatRisk(
+          lat: point.$1,
+          lng: point.$2,
+        );
+      }),
+    );
+
+    final now = DateTime.now();
+    final zoneRadiusMeters = (radiusKm * 1000 / 5).clamp(300, 900).toDouble();
+
+    return List.generate(samples.length, (i) {
+      final data = samples[i];
+      return HeatZone(
+        id: 'rtz_$i',
+        latitude: data.latitude,
+        longitude: data.longitude,
+        radius: zoneRadiusMeters,
+        riskScore: data.riskScore,
+        temperature: data.temperature,
+        name: _zoneNameForRisk(i, data.riskScore),
+        updatedAt: now,
+      );
+    });
+  }
+
+  List<(double, double)> _buildZoneSamplePoints({
+    required double centerLat,
+    required double centerLng,
+    required double radiusKm,
+  }) {
+    final spreadKm = (radiusKm.clamp(4, 20) / 5).toDouble();
+    final latDelta = spreadKm / 111.32;
+    final cosLat = math.cos(centerLat * math.pi / 180).abs().clamp(0.2, 1.0);
+    final lngDelta = spreadKm / (111.32 * cosLat);
+
+    return [
+      (centerLat, centerLng),
+      (centerLat + latDelta, centerLng + lngDelta),
+      (centerLat + latDelta, centerLng - lngDelta),
+      (centerLat - latDelta, centerLng + lngDelta),
+      (centerLat - latDelta, centerLng - lngDelta),
+    ];
+  }
+
+  String _zoneNameForRisk(int index, double riskScore) {
+    final prefix = riskScore >= 0.75
+        ? 'Critical Heat Zone'
+        : riskScore >= 0.40
+            ? 'Elevated Heat Zone'
+            : 'Low Heat Zone';
+    return '$prefix ${index + 1}';
   }
 
   /// Fetch 7-day heat history

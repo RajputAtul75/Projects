@@ -18,8 +18,9 @@ dependencies:
   # Navigation
   go_router: ^14.8.1
 
-  # Google Maps
-  google_maps_flutter: ^2.12.1
+  # Free map (Leaflet)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
   # Location
   geolocator: ^13.0.2

@@ -15,14 +15,14 @@ final storageServiceProvider = Provider<StorageService>((ref) {
 
 /// Current heat data for user's location
 final heatDataProvider = FutureProvider<HeatData>((ref) async {
-  final position = await ref.watch(currentPositionProvider.future);
+  final location = await ref.watch(activeCityLocationProvider.future);
   final apiService = ref.read(apiServiceProvider);
   final storageService = ref.read(storageServiceProvider);
 
   try {
     final data = await apiService.fetchHeatRisk(
-      lat: position.latitude,
-      lng: position.longitude,
+      lat: location.latitude,
+      lng: location.longitude,
     );
     // Cache for offline
     await storageService.cacheHeatData(data);
@@ -37,24 +37,24 @@ final heatDataProvider = FutureProvider<HeatData>((ref) async {
 
 /// Heat zones near user
 final heatZonesProvider = FutureProvider<List<HeatZone>>((ref) async {
-  final position = await ref.watch(currentPositionProvider.future);
+  final location = await ref.watch(activeCityLocationProvider.future);
   final apiService = ref.read(apiServiceProvider);
   return apiService.fetchHeatZones(
-    lat: position.latitude,
-    lng: position.longitude,
+    lat: location.latitude,
+    lng: location.longitude,
   );
 });
 
 /// 7-day heat history
 final heatHistoryProvider = FutureProvider<List<HeatData>>((ref) async {
-  final position = await ref.watch(currentPositionProvider.future);
+  final location = await ref.watch(activeCityLocationProvider.future);
   final apiService = ref.read(apiServiceProvider);
   final storageService = ref.read(storageServiceProvider);
 
   try {
     final data = await apiService.fetchHeatHistory(
-      lat: position.latitude,
-      lng: position.longitude,
+      lat: location.latitude,
+      lng: location.longitude,
     );
     await storageService.cacheHeatHistory(data);
     return data;
@@ -67,10 +67,10 @@ final heatHistoryProvider = FutureProvider<List<HeatData>>((ref) async {
 
 /// AI heat prediction (next 24 hours)
 final heatPredictionProvider = FutureProvider<List<HeatData>>((ref) async {
-  final position = await ref.watch(currentPositionProvider.future);
+  final location = await ref.watch(activeCityLocationProvider.future);
   final apiService = ref.read(apiServiceProvider);
   return apiService.fetchHeatPrediction(
-    lat: position.latitude,
-    lng: position.longitude,
+    lat: location.latitude,
+    lng: location.longitude,
   );
 });

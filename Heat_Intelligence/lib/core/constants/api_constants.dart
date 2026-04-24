@@ -5,14 +5,8 @@ class ApiConstants {
   /// Base URL — change this to your deployed backend
   static const String baseUrl = 'https://api.heatintelligence.io';
 
-  /// OpenWeather current weather endpoint base
-  static const String weatherBaseUrl = 'https://api.openweathermap.org';
-
-  /// Inject using: --dart-define=WEATHER_API_KEY=your_key
-  static const String weatherApiKey =
-      String.fromEnvironment('WEATHER_API_KEY', defaultValue: '');
-
-  static bool get hasWeatherApiKey => weatherApiKey.trim().isNotEmpty;
+  /// Open-Meteo weather endpoint base (free and keyless)
+  static const String weatherBaseUrl = 'https://api.open-meteo.com';
 
   /// Endpoints
   static const String heatRisk = '/api/heat-risk';
@@ -21,8 +15,8 @@ class ApiConstants {
   static const String heatPrediction = '/api/heat-prediction';
   static const String alerts = '/api/alerts';
 
-  /// OpenWeather endpoints
-  static const String weatherCurrent = '/data/2.5/weather';
+  /// Open-Meteo endpoint
+  static const String weatherCurrent = '/v1/forecast';
 
   /// Timeouts (ms)
   static const int connectTimeout = 15000;

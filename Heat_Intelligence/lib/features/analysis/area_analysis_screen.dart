@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/heat_data.dart';
+import '../../core/models/heat_zone.dart';
 import '../../core/providers/heat_provider.dart';
 import '../../core/widgets/loading_widget.dart';
 import '../../core/widgets/heat_card.dart';
@@ -17,6 +20,7 @@ class AreaAnalysisScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final heatAsync = ref.watch(heatDataProvider);
+    final zonesAsync = ref.watch(heatZonesProvider);
     final historyAsync = ref.watch(heatHistoryProvider);
     final predictionAsync = ref.watch(heatPredictionProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -67,6 +71,18 @@ class AreaAnalysisScreen extends ConsumerWidget {
               // Risk score gauge
               SliverToBoxAdapter(
                 child: _buildRiskGauge(context, heatData, isDark),
+              ),
+
+              // Map overview
+              SliverToBoxAdapter(
+                child: zonesAsync.when(
+                  loading: () => const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: LoadingWidget(height: 250)),
+                  error: (_, _) => const SizedBox.shrink(),
+                  data: (zones) =>
+                      _buildMapOverview(context, heatData, zones, isDark),
+                ),
               ),
 
               // Heat history
@@ -241,6 +257,111 @@ class AreaAnalysisScreen extends ConsumerWidget {
         ),
       ),
     ).animate().fadeIn(delay: 200.ms, duration: 500.ms);
+  }
+
+  Widget _buildMapOverview(
+    BuildContext context,
+    HeatData heatData,
+    List<HeatZone> zones,
+    bool isDark,
+  ) {
+    final center = LatLng(heatData.latitude, heatData.longitude);
+
+    final circles = zones.map((zone) {
+      final color = AppColors.getRiskColor(zone.riskScore);
+      return CircleMarker(
+        point: LatLng(zone.latitude, zone.longitude),
+        radius: (zone.radius / 20).clamp(16, 48),
+        color: color.withValues(alpha: 0.18),
+        borderColor: color.withValues(alpha: 0.65),
+        borderStrokeWidth: 2,
+      );
+    }).toList();
+
+    final markers = <Marker>[
+      Marker(
+        point: center,
+        width: 34,
+        height: 34,
+        child: const Icon(Icons.my_location_rounded,
+            color: AppColors.primary, size: 22),
+      ),
+      ...zones.map((zone) {
+        final markerColor = AppColors.getRiskColor(zone.riskScore);
+        return Marker(
+          point: LatLng(zone.latitude, zone.longitude),
+          width: 34,
+          height: 34,
+          child: Icon(Icons.location_on_rounded,
+              color: markerColor, size: 26),
+        );
+      }),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.map_rounded,
+                    color: AppColors.primary, size: 22),
+                const SizedBox(width: 8),
+                Text(
+                  'Area Map Overview',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                height: 220,
+                child: FlutterMap(
+                  options: MapOptions(
+                    initialCenter: center,
+                    initialZoom: 13,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.pinchZoom |
+                          InteractiveFlag.drag |
+                          InteractiveFlag.doubleTapZoom,
+                    ),
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.hdi.heat_intelligence',
+                    ),
+                    CircleLayer(circles: circles),
+                    MarkerLayer(markers: markers),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(delay: 250.ms, duration: 500.ms);
   }
 
   Widget _buildHistoryChart(

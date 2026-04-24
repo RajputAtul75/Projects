@@ -1,14 +1,15 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/models/heat_zone.dart';
 import '../../core/providers/heat_provider.dart';
 import '../../core/providers/location_provider.dart';
+import '../../core/services/location_service.dart';
 import '../../core/widgets/loading_widget.dart';
 
 class HeatMapScreen extends ConsumerStatefulWidget {
@@ -19,60 +20,81 @@ class HeatMapScreen extends ConsumerStatefulWidget {
 }
 
 class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
-  final Completer<GoogleMapController> _mapController = Completer();
-  MapType _mapType = MapType.normal;
+  final MapController _mapController = MapController();
+  double _zoom = 13.5;
+  bool _useSatelliteTiles = false;
   bool _showLegend = true;
+  LatLng? _lastMapCenter;
 
   @override
   Widget build(BuildContext context) {
-    final positionAsync = ref.watch(currentPositionProvider);
+    final locationAsync = ref.watch(activeCityLocationProvider);
     final zonesAsync = ref.watch(heatZonesProvider);
+    final selectedCity = ref.watch(selectedCityProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: positionAsync.when(
+      body: locationAsync.when(
         loading: () => const Center(child: DashboardLoadingWidget()),
         error: (err, _) => ErrorRetryWidget(
           message: err.toString(),
-          onRetry: () => ref.invalidate(currentPositionProvider),
+          onRetry: () => ref.invalidate(activeCityLocationProvider),
         ),
-        data: (position) {
-          final userLatLng =
-              LatLng(position.latitude, position.longitude);
+        data: (activeLocation) {
+          final userLatLng = LatLng(
+            activeLocation.latitude,
+            activeLocation.longitude,
+          );
+
+          if (_lastMapCenter == null ||
+              (_lastMapCenter!.latitude - userLatLng.latitude).abs() >
+                      0.0001 ||
+              (_lastMapCenter!.longitude - userLatLng.longitude).abs() >
+                      0.0001) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _mapController.move(userLatLng, _zoom);
+            });
+            _lastMapCenter = userLatLng;
+          }
+
+          final zones = zonesAsync.maybeWhen(
+            data: (data) => data,
+            orElse: () => const <HeatZone>[],
+          );
 
           return Stack(
             children: [
-              // Google Map
-              GoogleMap(
-                initialCameraPosition: CameraPosition(
-                  target: userLatLng,
-                  zoom: 13.5,
+              // Leaflet map
+              FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: userLatLng,
+                  initialZoom: _zoom,
+                  interactionOptions: const InteractionOptions(
+                    flags: InteractiveFlag.drag |
+                        InteractiveFlag.pinchZoom |
+                        InteractiveFlag.doubleTapZoom,
+                  ),
                 ),
-                style: isDark ? _darkMapStyle : null,
-                onMapCreated: (controller) {
-                  if (!_mapController.isCompleted) {
-                    _mapController.complete(controller);
-                  }
-                },
-                mapType: _mapType,
-                myLocationEnabled: true,
-                myLocationButtonEnabled: false,
-                zoomControlsEnabled: false,
-                compassEnabled: true,
-                circles: zonesAsync.when(
-                  data: (zones) => _buildCircles(zones),
-                  loading: () => {},
-                  error: (_, _) => {},
-                ),
-                markers: zonesAsync.when(
-                  data: (zones) => _buildMarkers(zones),
-                  loading: () => {},
-                  error: (_, _) => {},
-                ),
+                children: [
+                  TileLayer(
+                    urlTemplate: _tileUrlTemplate(isDark),
+                    subdomains: const ['a', 'b', 'c'],
+                    userAgentPackageName: 'com.hdi.heat_intelligence',
+                  ),
+                  CircleLayer(circles: _buildCircles(zones)),
+                  MarkerLayer(markers: _buildMarkers(zones, userLatLng)),
+                ],
               ),
 
               // Top bar overlay
-              _buildTopBar(context, isDark),
+              _buildTopBar(
+                context,
+                isDark,
+                selectedCity?.name ?? 'Current Location',
+                onSearchCity: _onSearchCity,
+                onUseCurrentLocation: _onUseCurrentLocation,
+              ),
 
               // Legend
               if (_showLegend)
@@ -109,7 +131,84 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
     );
   }
 
-  Widget _buildTopBar(BuildContext context, bool isDark) {
+  Future<void> _onSearchCity() async {
+    final controller = TextEditingController();
+
+    final query = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+          title: Text(
+            'Search City',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : AppColors.textPrimary,
+            ),
+          ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Enter city name',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+              child: const Text('Search'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || query == null || query.isEmpty) {
+      return;
+    }
+
+    try {
+      final locationService = ref.read(locationServiceProvider);
+      final city = await locationService.searchCity(query);
+      if (!mounted) return;
+      ref.read(selectedCityProvider.notifier).state = city;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Showing heat zones for ${city.name}')),
+      );
+    } on LocationException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not find that city.')),
+      );
+    }
+  }
+
+  void _onUseCurrentLocation() {
+    ref.read(selectedCityProvider.notifier).state = null;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Using your current location')),
+    );
+  }
+
+  Widget _buildTopBar(
+    BuildContext context,
+    bool isDark,
+    String locationLabel, {
+    required VoidCallback onSearchCity,
+    required VoidCallback onUseCurrentLocation,
+  }) {
     return Positioned(
       top: MediaQuery.of(context).padding.top + 8,
       left: 16,
@@ -142,15 +241,53 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
                 color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                locationLabel,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: onUseCurrentLocation,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.my_location_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+            ),
+            GestureDetector(
+              onTap: onSearchCity,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.search_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+            ),
             // Map type toggle
             GestureDetector(
               onTap: () {
-                setState(() {
-                  _mapType = _mapType == MapType.normal
-                      ? MapType.satellite
-                      : MapType.normal;
-                });
+                setState(() => _useSatelliteTiles = !_useSatelliteTiles);
               },
               child: Container(
                 padding: const EdgeInsets.all(8),
@@ -159,7 +296,7 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
-                  _mapType == MapType.normal
+                  !_useSatelliteTiles
                       ? Icons.satellite_alt_rounded
                       : Icons.map_outlined,
                   color: AppColors.primary,
@@ -240,18 +377,18 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
         _mapControlButton(
           icon: Icons.add,
           isDark: isDark,
-          onTap: () async {
-            final controller = await _mapController.future;
-            controller.animateCamera(CameraUpdate.zoomIn());
+          onTap: () {
+            setState(() => _zoom = (_zoom + 1).clamp(4, 18));
+            _mapController.move(_mapController.camera.center, _zoom);
           },
         ),
         const SizedBox(height: 8),
         _mapControlButton(
           icon: Icons.remove,
           isDark: isDark,
-          onTap: () async {
-            final controller = await _mapController.future;
-            controller.animateCamera(CameraUpdate.zoomOut());
+          onTap: () {
+            setState(() => _zoom = (_zoom - 1).clamp(4, 18));
+            _mapController.move(_mapController.camera.center, _zoom);
           },
         ),
         const SizedBox(height: 8),
@@ -259,13 +396,9 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
           icon: Icons.my_location_rounded,
           isDark: isDark,
           color: AppColors.primary,
-          onTap: () async {
-            final controller = await _mapController.future;
-            controller.animateCamera(
-              CameraUpdate.newCameraPosition(
-                CameraPosition(target: userLatLng, zoom: 14),
-              ),
-            );
+          onTap: () {
+            setState(() => _zoom = 14);
+            _mapController.move(userLatLng, _zoom);
           },
         ),
         const SizedBox(height: 8),
@@ -393,51 +526,51 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
     ).animate().fadeIn(delay: 800.ms).slideY(begin: 0.3);
   }
 
-  Set<Circle> _buildCircles(List<HeatZone> zones) {
+  String _tileUrlTemplate(bool isDark) {
+    if (_useSatelliteTiles) {
+      return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    }
+    if (isDark) {
+      return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+    }
+    return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  }
+
+  List<CircleMarker> _buildCircles(List<HeatZone> zones) {
     return zones.map((zone) {
       final color = AppColors.getRiskColor(zone.riskScore);
-      return Circle(
-        circleId: CircleId(zone.id),
-        center: LatLng(zone.latitude, zone.longitude),
-        radius: zone.radius,
-        fillColor: color.withValues(alpha: 0.2),
-        strokeColor: color.withValues(alpha: 0.6),
-        strokeWidth: 2,
+      return CircleMarker(
+        point: LatLng(zone.latitude, zone.longitude),
+        radius: (zone.radius / 20).clamp(16, 48),
+        color: color.withValues(alpha: 0.2),
+        borderColor: color.withValues(alpha: 0.6),
+        borderStrokeWidth: 2,
       );
-    }).toSet();
+    }).toList();
   }
 
-  Set<Marker> _buildMarkers(List<HeatZone> zones) {
-    return zones.map((zone) {
+  List<Marker> _buildMarkers(List<HeatZone> zones, LatLng userLatLng) {
+    return [
+      Marker(
+        point: userLatLng,
+        width: 34,
+        height: 34,
+        child: const Icon(Icons.my_location_rounded,
+            color: AppColors.primary, size: 22),
+      ),
+      ...zones.map((zone) {
+        final markerColor = AppColors.getRiskColor(zone.riskScore);
       return Marker(
-        markerId: MarkerId(zone.id),
-        position: LatLng(zone.latitude, zone.longitude),
-        infoWindow: InfoWindow(
-          title: zone.name,
-          snippet:
-              '${zone.temperature.toStringAsFixed(1)}°C | Risk: ${(zone.riskScore * 100).toInt()}%',
-        ),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          zone.riskScore >= 0.75
-              ? BitmapDescriptor.hueRed
-              : zone.riskScore >= 0.40
-                  ? BitmapDescriptor.hueOrange
-                  : BitmapDescriptor.hueGreen,
+        point: LatLng(zone.latitude, zone.longitude),
+        width: 34,
+        height: 34,
+        child: Icon(
+          Icons.location_on_rounded,
+          color: markerColor,
+          size: 26,
         ),
       );
-    }).toSet();
+      }),
+    ];
   }
-
-  static const String _darkMapStyle = '''
-  [
-    {"elementType":"geometry","stylers":[{"color":"#242f3e"}]},
-    {"elementType":"labels.text.fill","stylers":[{"color":"#746855"}]},
-    {"elementType":"labels.text.stroke","stylers":[{"color":"#242f3e"}]},
-    {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#d59563"}]},
-    {"featureType":"road","elementType":"geometry","stylers":[{"color":"#38414e"}]},
-    {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#212a37"}]},
-    {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#9ca5b3"}]},
-    {"featureType":"water","elementType":"geometry","stylers":[{"color":"#17263c"}]}
-  ]
-  ''';
 }
