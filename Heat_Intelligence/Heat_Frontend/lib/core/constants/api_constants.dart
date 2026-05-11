@@ -3,7 +3,7 @@ class ApiConstants {
   ApiConstants._();
 
   /// Base URL — change this to your deployed backend
-  static const String baseUrl = 'https://api.heatintelligence.io';
+  static const String baseUrl = 'http://127.0.0.1:8000';
 
   /// Open-Meteo weather endpoint base (free and keyless)
   static const String weatherBaseUrl = 'https://api.open-meteo.com';

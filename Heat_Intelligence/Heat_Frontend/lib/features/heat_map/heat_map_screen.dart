@@ -11,6 +11,9 @@ import '../../core/providers/heat_provider.dart';
 import '../../core/providers/location_provider.dart';
 import '../../core/services/location_service.dart';
 import '../../core/widgets/loading_widget.dart';
+import 'models/route_segment.dart';
+import 'providers/route_provider.dart';
+import 'widgets/route_summary_sheet.dart';
 
 class HeatMapScreen extends ConsumerStatefulWidget {
   const HeatMapScreen({super.key});
@@ -21,6 +24,58 @@ class HeatMapScreen extends ConsumerStatefulWidget {
 
 class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
   final MapController _mapController = MapController();
+  static const List<String> _majorIndianCities = [
+    'New Delhi',
+    'Mumbai',
+    'Bengaluru',
+    'Kolkata',
+    'Chennai',
+    'Hyderabad',
+    'Pune',
+    'Ahmedabad',
+    'Jaipur',
+    'Lucknow',
+    'Kanpur',
+    'Nagpur',
+    'Indore',
+    'Bhopal',
+    'Patna',
+    'Ranchi',
+    'Bhubaneswar',
+    'Guwahati',
+    'Srinagar',
+    'Chandigarh',
+    'Amritsar',
+    'Ludhiana',
+    'Surat',
+    'Vadodara',
+    'Rajkot',
+    'Nashik',
+    'Aurangabad',
+    'Thane',
+    'Navi Mumbai',
+    'Mysuru',
+    'Mangaluru',
+    'Kochi',
+    'Thiruvananthapuram',
+    'Coimbatore',
+    'Madurai',
+    'Vijayawada',
+    'Visakhapatnam',
+    'Warangal',
+    'Jodhpur',
+    'Udaipur',
+    'Agra',
+    'Varanasi',
+    'Prayagraj',
+    'Noida',
+    'Gurugram',
+    'Faridabad',
+    'Dehradun',
+    'Shimla',
+    'Jammu',
+    'Panaji',
+  ];
   double _zoom = 13.5;
   bool _useSatelliteTiles = false;
   bool _showLegend = true;
@@ -31,6 +86,9 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
     final locationAsync = ref.watch(activeCityLocationProvider);
     final zonesAsync = ref.watch(heatZonesProvider);
     final selectedCity = ref.watch(selectedCityProvider);
+    final origin = ref.watch(originProvider);
+    final destination = ref.watch(destinationProvider);
+    final routeSegmentsAsync = ref.watch(routeSegmentProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -70,6 +128,16 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
                 options: MapOptions(
                   initialCenter: userLatLng,
                   initialZoom: _zoom,
+                  onTap: (tapPosition, latLng) {
+                    if (origin == null) {
+                      ref.read(originProvider.notifier).state = latLng;
+                    } else if (destination == null) {
+                      ref.read(destinationProvider.notifier).state = latLng;
+                    } else {
+                      ref.read(originProvider.notifier).state = latLng;
+                      ref.read(destinationProvider.notifier).state = null;
+                    }
+                  },
                   interactionOptions: const InteractionOptions(
                     flags: InteractiveFlag.drag |
                         InteractiveFlag.pinchZoom |
@@ -83,7 +151,10 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
                     userAgentPackageName: 'com.hdi.heat_intelligence',
                   ),
                   CircleLayer(circles: _buildCircles(zones)),
-                  MarkerLayer(markers: _buildMarkers(zones, userLatLng)),
+                  PolylineLayer(
+                    polylines: _buildPolylines(routeSegmentsAsync),
+                  ),
+                  MarkerLayer(markers: _buildMarkers(zones, userLatLng, origin, destination)),
                 ],
               ),
 
@@ -112,18 +183,19 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
               ),
 
               // Selected zone info
-              zonesAsync.when(
-                data: (zones) => zones.isNotEmpty
-                    ? Positioned(
-                        left: 16,
-                        right: 16,
-                        bottom: 24,
-                        child: _buildZoneInfo(zones.first, isDark),
-                      )
-                    : const SizedBox.shrink(),
-                loading: () => const SizedBox.shrink(),
-                error: (_, _) => const SizedBox.shrink(),
-              ),
+              if (zonesAsync.hasValue && zonesAsync.value!.isNotEmpty)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 24,
+                  child: (origin != null && destination != null)
+                      ? routeSegmentsAsync.when(
+                          data: (segments) => RouteSummarySheet(segments: segments),
+                          loading: () => const Center(child: CircularProgressIndicator()),
+                          error: (_, _) => const SizedBox.shrink(),
+                        )
+                      : _buildZoneInfo(zonesAsync.value!.first, isDark),
+                ),
             ],
           );
         },
@@ -132,43 +204,7 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
   }
 
   Future<void> _onSearchCity() async {
-    final controller = TextEditingController();
-
-    final query = await showDialog<String>(
-      context: context,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
-          title: Text(
-            'Search City',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600,
-              color: isDark ? Colors.white : AppColors.textPrimary,
-            ),
-          ),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              hintText: 'Enter city name',
-              border: OutlineInputBorder(),
-            ),
-            onSubmitted: (value) => Navigator.of(ctx).pop(value.trim()),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-              child: const Text('Search'),
-            ),
-          ],
-        );
-      },
-    );
+    final query = await _showCitySearchDialog();
 
     if (!mounted || query == null || query.isEmpty) {
       return;
@@ -193,6 +229,13 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
         const SnackBar(content: Text('Could not find that city.')),
       );
     }
+  }
+
+  Future<String?> _showCitySearchDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => _CitySearchDialog(majorCities: _majorIndianCities),
+    );
   }
 
   void _onUseCurrentLocation() {
@@ -536,6 +579,21 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
     return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   }
 
+  List<Polyline> _buildPolylines(AsyncValue<List<RouteSegment>> routeSegmentsAsync) {
+    return routeSegmentsAsync.maybeWhen(
+      data: (segments) {
+        return segments.map((s) {
+          return Polyline(
+            points: s.points,
+            color: AppColors.getRiskColor(s.heatScore / 100),
+            strokeWidth: 5,
+          );
+        }).toList();
+      },
+      orElse: () => [],
+    );
+  }
+
   List<CircleMarker> _buildCircles(List<HeatZone> zones) {
     return zones.map((zone) {
       final color = AppColors.getRiskColor(zone.riskScore);
@@ -549,7 +607,7 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
     }).toList();
   }
 
-  List<Marker> _buildMarkers(List<HeatZone> zones, LatLng userLatLng) {
+  List<Marker> _buildMarkers(List<HeatZone> zones, LatLng userLatLng, LatLng? origin, LatLng? destination) {
     return [
       Marker(
         point: userLatLng,
@@ -558,6 +616,20 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
         child: const Icon(Icons.my_location_rounded,
             color: AppColors.primary, size: 22),
       ),
+      if (origin != null)
+        Marker(
+          point: origin,
+          width: 40,
+          height: 40,
+          child: const Icon(Icons.location_pin, color: Colors.green, size: 40),
+        ),
+      if (destination != null)
+        Marker(
+          point: destination,
+          width: 40,
+          height: 40,
+          child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+        ),
       ...zones.map((zone) {
         final markerColor = AppColors.getRiskColor(zone.riskScore);
       return Marker(
@@ -574,3 +646,116 @@ class _HeatMapScreenState extends ConsumerState<HeatMapScreen> {
     ];
   }
 }
+
+class _CitySearchDialog extends StatefulWidget {
+  final List<String> majorCities;
+
+  const _CitySearchDialog({required this.majorCities});
+
+  @override
+  State<_CitySearchDialog> createState() => _CitySearchDialogState();
+}
+
+class _CitySearchDialogState extends State<_CitySearchDialog> {
+  late final TextEditingController _controller;
+  late final ValueNotifier<List<String>> _filtered;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _filtered = ValueNotifier<List<String>>(widget.majorCities.take(10).toList());
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _filtered.dispose();
+    super.dispose();
+  }
+
+  void _refreshSuggestions(String value) {
+    final q = value.trim().toLowerCase();
+    if (q.isEmpty) {
+      _filtered.value = widget.majorCities.take(10).toList();
+      return;
+    }
+    _filtered.value = widget.majorCities
+        .where((city) => city.toLowerCase().contains(q))
+        .take(12)
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AlertDialog(
+      scrollable: true,
+      backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+      title: Text(
+        'Search Indian City',
+        style: GoogleFonts.poppins(
+          fontWeight: FontWeight.w600,
+          color: isDark ? Colors.white : AppColors.textPrimary,
+        ),
+      ),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Type a major city in India',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: _refreshSuggestions,
+              onSubmitted: (value) => Navigator.of(context).pop(value.trim()),
+            ),
+            const SizedBox(height: 12),
+            ValueListenableBuilder<List<String>>(
+              valueListenable: _filtered,
+              builder: (_, items, _) {
+                if (items.isEmpty) {
+                  return const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('No city suggestion. Press Search to try anyway.'),
+                  );
+                }
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  itemBuilder: (_, index) {
+                    final city = items[index];
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.location_city_rounded),
+                      title: Text(city),
+                      onTap: () => Navigator.of(context).pop(city),
+                    );
+                  },
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+          child: const Text('Search'),
+        ),
+      ],
+    );
+  }
+}
+
