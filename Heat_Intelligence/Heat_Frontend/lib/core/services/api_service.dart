@@ -31,9 +31,10 @@ class ApiService {
   Future<HeatData> fetchHeatRisk({
     required double lat,
     required double lng,
+    String? locationName,
   }) async {
     try {
-      return await _fetchRealtimeHeatRisk(lat: lat, lng: lng);
+      return await _fetchRealtimeHeatRisk(lat: lat, lng: lng, locationName: locationName);
     } on DioException catch (e) {
       developer.log(
         'Open-Meteo fetch failed (${e.type}), falling back to backend',
@@ -51,21 +52,28 @@ class ApiService {
         ApiConstants.heatRisk,
         queryParameters: {'lat': lat, 'lng': lng},
       );
-      return HeatData.fromJson(response.data as Map<String, dynamic>);
+      final data = HeatData.fromJson(response.data as Map<String, dynamic>);
+      return locationName != null 
+          ? data.copyWith(locationName: locationName)
+          : data;
     } on DioException catch (_) {
       // Return dummy data for offline / development
-      return HeatData.dummy(lat: lat, lng: lng);
+      final dummy = HeatData.dummy(lat: lat, lng: lng);
+      return locationName != null 
+          ? dummy.copyWith(locationName: locationName)
+          : dummy;
     }
   }
 
   Future<HeatData> _fetchRealtimeHeatRisk({
     required double lat,
     required double lng,
+    String? locationName,
   }) async {
     final response = await _dio.get(
       '${ApiConstants.weatherBaseUrl}${ApiConstants.weatherCurrent}',
       queryParameters: {
-        'lat': lat,
+        'latitude': lat,
         'longitude': lng,
         'current': 'temperature_2m,relative_humidity_2m,wind_speed_10m',
         'timezone': 'auto',
@@ -97,7 +105,7 @@ class ApiService {
     final timestamp =
         timeIso == null ? DateTime.now() : DateTime.tryParse(timeIso)?.toLocal() ?? DateTime.now();
 
-    final cityLabel = _resolveLocationLabel(data);
+    final cityLabel = locationName ?? _resolveLocationLabel(data);
 
     return HeatData(
       latitude: lat,
@@ -187,14 +195,36 @@ class ApiService {
 
     return List.generate(samples.length, (i) {
       final data = samples[i];
+      
+      // Simulate microclimates to ensure variety in heat zones (Safe, Moderate, Critical)
+      double tempVariance = 0.0;
+      double riskVariance = 0.0;
+      
+      if (i == 1) { // Moderate / Dense Urban
+         tempVariance = 2.5; 
+         riskVariance = 0.2;
+      } else if (i == 2) { // Safe / Park Area
+         tempVariance = -4.0;
+         riskVariance = -0.35;
+      } else if (i == 3) { // Critical / Industrial
+         tempVariance = 4.5;
+         riskVariance = 0.4;
+      } else if (i == 4) { // Moderate / Suburb
+         tempVariance = -1.5;
+         riskVariance = -0.15;
+      }
+
+      final modTemp = data.temperature + tempVariance;
+      final modRisk = (data.riskScore + riskVariance).clamp(0.0, 1.0);
+
       return HeatZone(
         id: 'rtz_$i',
         latitude: data.latitude,
         longitude: data.longitude,
         radius: zoneRadiusMeters,
-        riskScore: data.riskScore,
-        temperature: data.temperature,
-        name: _zoneNameForRisk(i, data.riskScore),
+        riskScore: modRisk,
+        temperature: modTemp,
+        name: _zoneNameForRisk(i, modRisk),
         updatedAt: now,
       );
     });
@@ -221,10 +251,10 @@ class ApiService {
 
   String _zoneNameForRisk(int index, double riskScore) {
     final prefix = riskScore >= 0.75
-        ? 'Critical Heat Zone'
+        ? 'Critical Zone'
         : riskScore >= 0.40
-            ? 'Elevated Heat Zone'
-            : 'Low Heat Zone';
+            ? 'Moderate Zone'
+            : 'Safe Zone';
     return '$prefix ${index + 1}';
   }
 

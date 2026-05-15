@@ -23,6 +23,7 @@ final heatDataProvider = FutureProvider<HeatData>((ref) async {
     final data = await apiService.fetchHeatRisk(
       lat: location.latitude,
       lng: location.longitude,
+      locationName: location.name,
     );
     // Cache for offline
     await storageService.cacheHeatData(data);

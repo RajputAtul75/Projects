@@ -26,6 +26,32 @@ class HeatData extends Equatable {
     this.uvIndex,
   });
 
+  HeatData copyWith({
+    double? latitude,
+    double? longitude,
+    double? temperature,
+    double? heatIndex,
+    double? humidity,
+    double? riskScore,
+    String? locationName,
+    DateTime? timestamp,
+    double? windSpeed,
+    double? uvIndex,
+  }) {
+    return HeatData(
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      temperature: temperature ?? this.temperature,
+      heatIndex: heatIndex ?? this.heatIndex,
+      humidity: humidity ?? this.humidity,
+      riskScore: riskScore ?? this.riskScore,
+      locationName: locationName ?? this.locationName,
+      timestamp: timestamp ?? this.timestamp,
+      windSpeed: windSpeed ?? this.windSpeed,
+      uvIndex: uvIndex ?? this.uvIndex,
+    );
+  }
+
   /// Risk level label
   String get riskLabel {
     if (riskScore >= 0.75) return 'High Risk';

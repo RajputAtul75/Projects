@@ -1,12 +1,62 @@
 from datetime import datetime, timedelta
-import random
+import collections
 from typing import Optional, List
+import asyncio
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Depends, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+import httpx
+
+import models, crud
+from database import engine, SessionLocal
+from sqlalchemy.orm import Session
 
 app = FastAPI(title="Heat Intelligence API", version="1.0.0")
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import uuid
+
+def check_heat_alerts():
+    """Background task to scan heat zones and generate alerts if risk gets too high."""
+    db = SessionLocal()
+    try:
+        # Example logic: scan all zones with risk > 0.8 that haven't been alerted
+        zones = db.query(models.HeatZone).filter(models.HeatZone.risk_score > 0.8).all()
+        for zone in zones:
+            # Check if an alert already exists for this zone recently (mock simplifcation)
+            recent_alert = db.query(models.Alert).filter(
+                models.Alert.location_name == zone.name,
+                models.Alert.timestamp >= datetime.now() - timedelta(hours=1)
+            ).first()
+            
+            if not recent_alert:
+                crud.create_alert(db, {
+                    "id": str(uuid.uuid4()),
+                    "title": "Automated Extreme Heat Warning",
+                    "message": f"Critical heat level detected in {zone.name}. Temperature at {zone.temperature}C.",
+                    "severity": "high",
+                    "risk_score": zone.risk_score,
+                    "location_name": zone.name
+                })
+                print(f"Generated alert for {zone.name}")
+    finally:
+        db.close()
+
+@app.on_event("startup")
+async def startup_event():
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(check_heat_alerts, 'interval', minutes=5)
+    scheduler.start()
+
+
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -55,112 +105,136 @@ class AlertModel(BaseModel):
 
 # --- Endpoints ---
 
+OPEN_METEO_BASE_URL = "https://api.open-meteo.com/v1/forecast"
+
+async def fetch_open_meteo_current(lat: float, lng: float):
+    async with httpx.AsyncClient() as client:
+        params = {
+            "latitude": lat,
+            "longitude": lng,
+            "current": "temperature_2m,relative_humidity_2m,wind_speed_10m",
+            "timezone": "auto"
+        }
+        res = await client.get(OPEN_METEO_BASE_URL, params=params)
+        res.raise_for_status()
+        return res.json()
+
+def calculate_risk(temp: float, humidity: float):
+    # Basic Heat Risk logic (ML substitute)
+    # Higher temp and humidity -> higher risk
+    base_risk = (temp - 30) / 15.0 # normalize somewhat
+    humid_factor = (humidity - 40) / 100.0
+    risk = base_risk + humid_factor
+    return max(0.0, min(risk, 1.0))
+
 @app.get("/api/heat-risk", response_model=HeatData)
 async def get_heat_risk(lat: float = Query(...), lng: float = Query(...)):
-    """Returns the real-time heat risk data for a given location."""
-    # Generating realistic looking response data
-    temp = random.uniform(35.0, 42.0)
-    risk = random.uniform(0.3, 0.9)
-    return HeatData(
-        latitude=lat,
-        longitude=lng,
-        temperature=round(temp, 1),
-        heat_index=round(temp + random.uniform(2.0, 5.0), 1),
-        humidity=round(random.uniform(40.0, 75.0), 1),
-        risk_score=round(risk, 2),
-        location_name=f"Lat {round(lat, 2)}, Lng {round(lng, 2)}",
-        timestamp=datetime.now().isoformat(),
-        wind_speed=round(random.uniform(5.0, 15.0), 1),
-        uv_index=round(random.uniform(6.0, 11.0), 1),
-    )
+    """Returns the real-time heat risk data from Open-Meteo with calculated risk score."""
+    try:
+        data = await fetch_open_meteo_current(lat, lng)
+        current = data.get("current", {})
+        temp = current.get("temperature_2m", 35.0)
+        humidity = current.get("relative_humidity_2m", 50.0)
+        wind_speed = current.get("wind_speed_10m")
+        
+        # Calculate derived metrics
+        heat_index = temp + (humidity * 0.05) # dummy calculation
+        risk_score = calculate_risk(temp, humidity)
+        
+        return HeatData(
+            latitude=lat,
+            longitude=lng,
+            temperature=temp,
+            heat_index=round(heat_index, 1),
+            humidity=humidity,
+            risk_score=round(risk_score, 2),
+            location_name=f"Lat {round(lat, 2)}, Lng {round(lng, 2)}",
+            timestamp=datetime.now().isoformat(),
+            wind_speed=wind_speed,
+            uv_index=None,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/heat-zones", response_model=List[HeatZone])
-async def get_heat_zones(lat: float = Query(...), lng: float = Query(...), radius: float = Query(10.0)):
-    """Returns a list of high-risk heat zones near the center coordinates."""
-    zones = []
-    
-    # Generate some dummy zones around the point
-    for i in range(5):
-        lat_offset = random.uniform(-0.02, 0.02)
-        lng_offset = random.uniform(-0.02, 0.02)
-        risk = random.uniform(0.4, 0.9)
+async def get_heat_zones(lat: float = Query(...), lng: float = Query(...), radius: float = Query(10.0), db: Session = Depends(get_db)):
+    """Returns a list of high-risk heat zones from the database."""
+    zones = crud.get_heat_zones(db, lat, lng, radius)
+    if not zones:
+        # Seed some dummy zones close to requested coordinate for testing
+        crud.create_heat_zone(db, {
+            "id": "seed_zone_1", "latitude": lat + 0.01, "longitude": lng + 0.01,
+            "radius": 500, "risk_score": 0.8, "temperature": 39.5, "name": "Industrial Area"
+        })
+        crud.create_heat_zone(db, {
+            "id": "seed_zone_2", "latitude": lat - 0.01, "longitude": lng - 0.01,
+            "radius": 800, "risk_score": 0.6, "temperature": 36.0, "name": "Downtown Strip"
+        })
+        zones = crud.get_heat_zones(db, lat, lng, radius)
         
-        zones.append(HeatZone(
-            id=f"zone_{i+1}",
-            latitude=round(lat + lat_offset, 5),
-            longitude=round(lng + lng_offset, 5),
-            radius=round(random.uniform(300.0, 800.0), 1),
-            risk_score=round(risk, 2),
-            temperature=round(35.0 + (risk * 10), 1),
-            name=f"Zone {'ABCDE'[i]}",
-            updated_at=datetime.now().isoformat()
-        ))
     return zones
 
+import uuid
 @app.get("/api/heat-history", response_model=List[HeatData])
-async def get_heat_history(lat: float = Query(...), lng: float = Query(...)):
-    """Returns 7-day historical heat data."""
-    history = []
-    now = datetime.now()
-    for i in range(7):
-        temp = random.uniform(34.0, 40.0)
-        history.append(HeatData(
-            latitude=lat,
-            longitude=lng,
-            temperature=round(temp, 1),
-            heat_index=round(temp + random.uniform(2.0, 4.0), 1),
-            humidity=round(random.uniform(50.0, 70.0), 1),
-            risk_score=round(random.uniform(0.3, 0.8), 2),
-            location_name=f"Location",
-            timestamp=(now - timedelta(days=6 - i)).isoformat(),
-            wind_speed=round(random.uniform(5.0, 12.0), 1),
-            uv_index=round(random.uniform(5.0, 9.0), 1),
-        ))
-    return history
+async def get_heat_history(lat: float = Query(...), lng: float = Query(...), db: Session = Depends(get_db)):
+    """Returns 7-day historical heat data from database."""
+    history = crud.get_heat_history(db, lat, lng)
+    if not history:
+        # Seed test history
+        now = datetime.now()
+        for i in range(7):
+            crud.create_heat_history(db, {
+                "id": str(uuid.uuid4()), "latitude": lat, "longitude": lng,
+                "temperature": 34.0 + i, "heat_index": 36.0 + i, "humidity": 55.0, 
+                "risk_score": 0.4 + (i*0.05), "location_name": "Location",
+                "timestamp": now - timedelta(days=6 - i)
+            })
+        history = crud.get_heat_history(db, lat, lng)
+    
+    # Map to pydantic model format (which expects timestamp as str by default since we defined it as str in model but db is datetime)
+    return [
+        HeatData(
+            latitude=h.latitude, longitude=h.longitude, temperature=h.temperature,
+            heat_index=h.heat_index, humidity=h.humidity, risk_score=h.risk_score,
+            location_name=h.location_name, timestamp=h.timestamp.isoformat(),
+            wind_speed=h.wind_speed, uv_index=h.uv_index
+        ) for h in history
+    ]
 
 @app.get("/api/heat-prediction", response_model=List[HeatData])
-async def get_heat_prediction(lat: float = Query(...), lng: float = Query(...)):
-    """Returns 24-hour heat wave prediction (8 periods of 3 hrs)."""
-    prediction = []
-    now = datetime.now()
-    for i in range(8):
-        temp = random.uniform(36.0, 42.0)
-        prediction.append(HeatData(
-            latitude=lat,
-            longitude=lng,
-            temperature=round(temp, 1),
-            heat_index=round(temp + random.uniform(3.0, 5.0), 1),
-            humidity=round(random.uniform(45.0, 65.0), 1),
-            risk_score=round(random.uniform(0.4, 0.9), 2),
-            location_name=f"Location Prediction",
-            timestamp=(now + timedelta(hours=(i + 1) * 3)).isoformat(),
-            wind_speed=round(random.uniform(4.0, 10.0), 1),
-            uv_index=round(random.uniform(6.0, 11.0), 1),
-        ))
-    return prediction
+async def get_heat_prediction(lat: float = Query(...), lng: float = Query(...), db: Session = Depends(get_db)):
+    """Returns 24-hour heat wave prediction from database."""
+    predictions = crud.get_heat_predictions(db, lat, lng)
+    if not predictions:
+        now = datetime.now()
+        for i in range(8):
+            crud.create_heat_prediction(db, {
+                "id": str(uuid.uuid4()), "latitude": lat, "longitude": lng,
+                "temperature": 36.0 + (i*0.5), "heat_index": 38.0 + (i*0.6), "humidity": 50.0,
+                "risk_score": 0.5 + (i*0.04), "location_name": "Predicted Location",
+                "timestamp": now + timedelta(hours=(i + 1) * 3)
+            })
+        predictions = crud.get_heat_predictions(db, lat, lng)
+    
+    return [
+        HeatData(
+            latitude=p.latitude, longitude=p.longitude, temperature=p.temperature,
+            heat_index=p.heat_index, humidity=p.humidity, risk_score=p.risk_score,
+            location_name=p.location_name, timestamp=p.timestamp.isoformat(),
+            wind_speed=p.wind_speed, uv_index=p.uv_index
+        ) for p in predictions
+    ]
 
 @app.get("/api/alerts", response_model=List[AlertModel])
-async def get_alerts():
-    """Returns active heat alerts."""
-    return [
-        AlertModel(
-            id="1",
-            title="Extreme Heat Warning",
-            message="Temperature in Industrial Zone A has reached 42.3C. Risk score: 0.85.",
-            severity="high",
-            risk_score=0.85,
-            location_name="Industrial Zone A",
-            timestamp=datetime.now().isoformat(),
-            is_read=False
-        ),
-        AlertModel(
-            id="2",
-            title="Moderate Heat Advisory",
-            message="Market District is experiencing elevated temperatures. Stay hydrated.",
-            severity="moderate",
-            risk_score=0.62,
-            location_name="Market District",
-            timestamp=(datetime.now() - timedelta(hours=1)).isoformat(),
-            is_read=False
-        )
-    ]
+async def get_alerts_endpoint(db: Session = Depends(get_db)):
+    """Returns active heat alerts from the database."""
+    alerts = crud.get_alerts(db)
+    if not alerts:
+        # Seed test alerts
+        crud.create_alert(db, {
+            "id": "test_alert_A", "title": "Extreme Heat Warning",
+            "message": "Temperature is critically high in Industrial Zone.",
+            "severity": "high", "risk_score": 0.85, "location_name": "Industrial Zone"
+        })
+        alerts = crud.get_alerts(db)
+    return alerts

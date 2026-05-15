@@ -1,9 +1,15 @@
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// API endpoint constants
 class ApiConstants {
   ApiConstants._();
 
   /// Base URL — change this to your deployed backend
-  static const String baseUrl = 'http://127.0.0.1:8000';
+  static String get baseUrl {
+    if (kIsWeb) return 'http://127.0.0.1:8000';
+    return Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000';
+  }
 
   /// Open-Meteo weather endpoint base (free and keyless)
   static const String weatherBaseUrl = 'https://api.open-meteo.com';

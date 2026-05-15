@@ -690,7 +690,6 @@ class _CitySearchDialogState extends State<_CitySearchDialog> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return AlertDialog(
-      scrollable: true,
       backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
       title: Text(
         'Search Indian City',
@@ -701,6 +700,7 @@ class _CitySearchDialogState extends State<_CitySearchDialog> {
       ),
       content: SizedBox(
         width: 420,
+        height: 400, // constrained height prevents overflow crashes
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -716,31 +716,32 @@ class _CitySearchDialogState extends State<_CitySearchDialog> {
               onSubmitted: (value) => Navigator.of(context).pop(value.trim()),
             ),
             const SizedBox(height: 12),
-            ValueListenableBuilder<List<String>>(
-              valueListenable: _filtered,
-              builder: (_, items, _) {
-                if (items.isEmpty) {
-                  return const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('No city suggestion. Press Search to try anyway.'),
-                  );
-                }
-                return ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                  itemBuilder: (_, index) {
-                    final city = items[index];
-                    return ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.location_city_rounded),
-                      title: Text(city),
-                      onTap: () => Navigator.of(context).pop(city),
+            Expanded(
+              child: ValueListenableBuilder<List<String>>(
+                valueListenable: _filtered,
+                builder: (_, items, _) {
+                  if (items.isEmpty) {
+                    return const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text('No city suggestion. Press Search to try anyway.'),
                     );
-                  },
-                );
-              },
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (_, index) {
+                      final city = items[index];
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.location_city_rounded),
+                        title: Text(city),
+                        onTap: () => Navigator.of(context).pop(city),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
