@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'currency_converter_material_page.dart';
 
-void main(){
+void main() {
   runApp(const MyApp());
 }
 
@@ -13,13 +14,13 @@ void main(){
 // 1. Material Design :- By Google
 // 2. Cupertino Design :- By Apple
 
-class MyApp extends StatelessWidget{
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context){
-    return MaterialApp(
-      home: Text('Hello World!!!'),
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: CurrencyConverterMaterialPage(),
     );
   }
 }

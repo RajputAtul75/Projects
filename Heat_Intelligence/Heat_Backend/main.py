@@ -9,10 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import httpx
 
 import models, crud
-from database import engine, SessionLocal
+from database import engine, SessionLocal, Base
 from sqlalchemy.orm import Session
-
-app = FastAPI(title="Heat Intelligence API", version="1.0.0")
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uuid
@@ -43,11 +41,32 @@ def check_heat_alerts():
     finally:
         db.close()
 
-@app.on_event("startup")
-async def startup_event():
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Ensure DB tables exist
+    Base.metadata.create_all(bind=engine)
+
     scheduler = AsyncIOScheduler()
     scheduler.add_job(check_heat_alerts, 'interval', minutes=5)
     scheduler.start()
+    
+    # Clean up any accidental duplicate seeded zones from previous runs
+    db = SessionLocal()
+    try:
+        try:
+            removed = crud.cleanup_duplicate_heat_zones(db)
+            if removed:
+                print(f"Cleaned up {removed} duplicate heat zone(s) on startup")
+        except Exception as e:
+            print("Warning: failed to cleanup duplicate zones:", e)
+    finally:
+        db.close()
+        
+    yield
+
+app = FastAPI(title="Heat Intelligence API", version="1.0.0", lifespan=lifespan)
 
 
 # Dependency
@@ -108,16 +127,25 @@ class AlertModel(BaseModel):
 OPEN_METEO_BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
 async def fetch_open_meteo_current(lat: float, lng: float):
-    async with httpx.AsyncClient() as client:
-        params = {
-            "latitude": lat,
-            "longitude": lng,
-            "current": "temperature_2m,relative_humidity_2m,wind_speed_10m",
-            "timezone": "auto"
-        }
-        res = await client.get(OPEN_METEO_BASE_URL, params=params)
-        res.raise_for_status()
-        return res.json()
+    # Add basic retry logic and timeout to make external calls more robust
+    params = {
+        "latitude": lat,
+        "longitude": lng,
+        "current": "temperature_2m,relative_humidity_2m,wind_speed_10m",
+        "timezone": "auto"
+    }
+    retries = 3
+    timeout = httpx.Timeout(10.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for attempt in range(1, retries + 1):
+            try:
+                res = await client.get(OPEN_METEO_BASE_URL, params=params)
+                res.raise_for_status()
+                return res.json()
+            except (httpx.RequestError, httpx.HTTPStatusError) as e:
+                if attempt == retries:
+                    raise
+                await asyncio.sleep(0.5 * attempt)
 
 def calculate_risk(temp: float, humidity: float):
     # Basic Heat Risk logic (ML substitute)
@@ -163,18 +191,29 @@ async def get_heat_zones(lat: float = Query(...), lng: float = Query(...), radiu
     if not zones:
         # Seed some dummy zones close to requested coordinate for testing
         crud.create_heat_zone(db, {
-            "id": "seed_zone_1", "latitude": lat + 0.01, "longitude": lng + 0.01,
+            "id": str(uuid.uuid4()), "latitude": lat + 0.01, "longitude": lng + 0.01,
             "radius": 500, "risk_score": 0.8, "temperature": 39.5, "name": "Industrial Area"
         })
         crud.create_heat_zone(db, {
-            "id": "seed_zone_2", "latitude": lat - 0.01, "longitude": lng - 0.01,
+            "id": str(uuid.uuid4()), "latitude": lat - 0.01, "longitude": lng - 0.01,
             "radius": 800, "risk_score": 0.6, "temperature": 36.0, "name": "Downtown Strip"
         })
         zones = crud.get_heat_zones(db, lat, lng, radius)
-        
-    return zones
 
-import uuid
+    return [
+        HeatZone(
+            id=z.id,
+            latitude=z.latitude,
+            longitude=z.longitude,
+            radius=z.radius,
+            risk_score=z.risk_score,
+            temperature=z.temperature,
+            name=z.name,
+            updated_at=z.updated_at.isoformat() if z.updated_at else datetime.now().isoformat(),
+        )
+        for z in zones
+    ]
+
 @app.get("/api/heat-history", response_model=List[HeatData])
 async def get_heat_history(lat: float = Query(...), lng: float = Query(...), db: Session = Depends(get_db)):
     """Returns 7-day historical heat data from database."""
@@ -238,3 +277,12 @@ async def get_alerts_endpoint(db: Session = Depends(get_db)):
         })
         alerts = crud.get_alerts(db)
     return alerts
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    return {"status": "ok", "service": "Heat Intelligence API", "version": "1.0.0"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

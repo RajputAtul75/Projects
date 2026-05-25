@@ -38,26 +38,29 @@ class DashboardLoadingWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          const LoadingWidget(height: 120),
-          const SizedBox(height: 16),
-          Row(
-            children: const [
-              Expanded(child: LoadingWidget(height: 100)),
-              SizedBox(width: 12),
-              Expanded(child: LoadingWidget(height: 100)),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const LoadingWidget(height: 80),
-          const SizedBox(height: 16),
-          const LoadingWidget(height: 200),
-          const SizedBox(height: 16),
-          const LoadingWidget(height: 120),
-        ],
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const LoadingWidget(height: 120),
+            const SizedBox(height: 16),
+            Row(
+              children: const [
+                Expanded(child: LoadingWidget(height: 100)),
+                SizedBox(width: 12),
+                Expanded(child: LoadingWidget(height: 100)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const LoadingWidget(height: 80),
+            const SizedBox(height: 16),
+            const LoadingWidget(height: 200),
+            const SizedBox(height: 16),
+            const LoadingWidget(height: 120),
+          ],
+        ),
       ),
     );
   }

@@ -157,9 +157,10 @@ class ApiService {
     }
 
     try {
+      // Backend expects radius in meters; frontend uses km internally.
       final response = await _dio.get(
         ApiConstants.heatZones,
-        queryParameters: {'lat': lat, 'lng': lng, 'radius': radiusKm},
+        queryParameters: {'lat': lat, 'lng': lng, 'radius': (radiusKm * 1000)},
       );
       final list = response.data as List<dynamic>;
       return list
