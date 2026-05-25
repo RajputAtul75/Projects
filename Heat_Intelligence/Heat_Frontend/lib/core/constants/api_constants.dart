@@ -7,8 +7,7 @@ class ApiConstants {
 
   /// Base URL — change this to your deployed backend
   static String get baseUrl {
-    if (kIsWeb) return 'http://127.0.0.1:8000';
-    return Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000';
+    return 'https://heat-backend-emvs.onrender.com';
   }
 
   /// Open-Meteo weather endpoint base (free and keyless)
