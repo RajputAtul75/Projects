@@ -4,3 +4,4 @@ pydantic
 httpx
 SQLAlchemy
 APScheduler
+psycopg2-binary

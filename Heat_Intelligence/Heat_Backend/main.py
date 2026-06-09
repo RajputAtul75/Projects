@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import collections
 from typing import Optional, List
 import asyncio
+import time
 
 from fastapi import FastAPI, Query, Depends, HTTPException
 from pydantic import BaseModel
@@ -68,6 +69,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Heat Intelligence API", version="1.0.0", lifespan=lifespan)
 
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
+
 
 # Dependency
 def get_db():
@@ -81,7 +88,7 @@ def get_db():
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -126,7 +133,19 @@ class AlertModel(BaseModel):
 
 OPEN_METEO_BASE_URL = "https://api.open-meteo.com/v1/forecast"
 
+# Simple in-memory cache to avoid IP rate limits from open-meteo
+weather_cache = {}
+
 async def fetch_open_meteo_current(lat: float, lng: float):
+    # Cache key based on roughly 11km grid
+    key = f"{round(lat, 1)}_{round(lng, 1)}"
+    now = time.time()
+    
+    if key in weather_cache:
+        cached_data, timestamp = weather_cache[key]
+        if now - timestamp < 300: # 5 minutes TTL
+            return cached_data
+
     # Add basic retry logic and timeout to make external calls more robust
     params = {
         "latitude": lat,
@@ -134,16 +153,34 @@ async def fetch_open_meteo_current(lat: float, lng: float):
         "current": "temperature_2m,relative_humidity_2m,wind_speed_10m",
         "timezone": "auto"
     }
+
     retries = 3
     timeout = httpx.Timeout(10.0)
     async with httpx.AsyncClient(timeout=timeout) as client:
         for attempt in range(1, retries + 1):
             try:
+                res = None
                 res = await client.get(OPEN_METEO_BASE_URL, params=params)
                 res.raise_for_status()
-                return res.json()
+                data = res.json()
+                weather_cache[key] = (data, now)
+                return data
             except (httpx.RequestError, httpx.HTTPStatusError) as e:
+                # If we encounter 429 and have cached data, return the stale cache
+                if res is not None and res.status_code == 429 and key in weather_cache:
+                    return weather_cache[key][0]
                 if attempt == retries:
+                    # Provide fallback offline data on 429 to avoid crashing
+                    if isinstance(e, httpx.HTTPStatusError) and e.response.status_code == 429:
+                        fallback_data = {
+                            "current": {
+                                "temperature_2m": 35.0,
+                                "relative_humidity_2m": 50.0,
+                                "wind_speed_10m": 10.0
+                            }
+                        }
+                        weather_cache[key] = (fallback_data, now)
+                        return fallback_data
                     raise
                 await asyncio.sleep(0.5 * attempt)
 
