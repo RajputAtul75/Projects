@@ -31,6 +31,5 @@ class ApiConstants {
   static Map<String, String> get defaultHeaders => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'X-App-Version': '1.0.0',
       };
 }
