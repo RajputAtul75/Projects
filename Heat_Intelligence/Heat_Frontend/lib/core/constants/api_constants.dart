@@ -1,5 +1,4 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+
 
 /// API endpoint constants
 class ApiConstants {
@@ -7,7 +6,7 @@ class ApiConstants {
 
   /// Base URL — change this to your deployed backend
   static String get baseUrl {
-    return 'https://heat-backend-emvs.onrender.com';
+    return 'http://localhost:8000';
   }
 
   /// Open-Meteo weather endpoint base (free and keyless)

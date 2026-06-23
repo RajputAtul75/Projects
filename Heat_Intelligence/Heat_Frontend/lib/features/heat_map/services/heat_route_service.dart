@@ -16,9 +16,9 @@ class HeatRouteService {
 
   Future<List<RouteSegment>> planHeatSafeRoute(LatLng origin, LatLng dest) async {
     final prefs = await SharedPreferences.getInstance();
-    final cacheKey = 'route_\${origin.latitude}_\${origin.longitude}_\${dest.latitude}_\${dest.longitude}';
+    final cacheKey = 'route_${origin.latitude}_${origin.longitude}_${dest.latitude}_${dest.longitude}';
     final cached = prefs.getString(cacheKey);
-    final cacheTime = prefs.getInt('\${cacheKey}_time');
+    final cacheTime = prefs.getInt('${cacheKey}_time');
 
     if (cached != null && cacheTime != null && DateTime.now().millisecondsSinceEpoch - cacheTime < 30 * 60 * 1000) {
       final decodedList = jsonDecode(cached) as List;
@@ -28,7 +28,7 @@ class HeatRouteService {
     try {
       // 1. Fetch OSRM Route
       final response = await _dio.get(
-        'http://router.project-osrm.org/route/v1/foot/\${origin.longitude},\${origin.latitude};\${dest.longitude},\${dest.latitude}?geometries=geojson',
+        'http://router.project-osrm.org/route/v1/foot/${origin.longitude},${origin.latitude};${dest.longitude},${dest.latitude}?geometries=geojson',
       );
 
       final routes = response.data['routes'] as List;
@@ -68,7 +68,7 @@ class HeatRouteService {
 
       final encoded = jsonEncode(segments.map((s) => _segmentToJson(s)).toList());
       await prefs.setString(cacheKey, encoded);
-      await prefs.setInt('\${cacheKey}_time', DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt('${cacheKey}_time', DateTime.now().millisecondsSinceEpoch);
 
       return segments;
     } catch (e) {
@@ -80,7 +80,7 @@ class HeatRouteService {
   Future<double> _fetchHeatScore(LatLng p) async {
     try {
       final res = await _dio.get(
-        'https://api.open-meteo.com/v1/forecast?latitude=\${p.latitude}&longitude=\${p.longitude}&current=temperature_2m,relative_humidity_2m,uv_index',
+        'https://api.open-meteo.com/v1/forecast?latitude=${p.latitude}&longitude=${p.longitude}&current=temperature_2m,relative_humidity_2m,uv_index',
       );
       final current = res.data['current'];
       final double tempC = (current['temperature_2m'] as num).toDouble();
