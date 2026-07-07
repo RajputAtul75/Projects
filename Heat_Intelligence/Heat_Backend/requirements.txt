@@ -5,3 +5,4 @@ httpx
 SQLAlchemy
 APScheduler
 psycopg2-binary
+firebase-admin

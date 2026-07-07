@@ -109,3 +109,28 @@ def create_heat_prediction(db: Session, data: dict):
     db.commit()
     db.refresh(db_pred)
     return db_pred
+
+def upsert_device(db: Session, fcm_token: str, lat: float, lng: float):
+    device = db.query(models.UserDevice).filter(models.UserDevice.fcm_token == fcm_token).first()
+    if device:
+        device.latitude = lat
+        device.longitude = lng
+        device.updated_at = datetime.datetime.utcnow()
+    else:
+        device = models.UserDevice(
+            id=str(uuid.uuid4()),
+            fcm_token=fcm_token,
+            latitude=lat,
+            longitude=lng
+        )
+        db.add(device)
+    db.commit()
+    db.refresh(device)
+    return device
+
+def remove_device(db: Session, fcm_token: str):
+    db.query(models.UserDevice).filter(models.UserDevice.fcm_token == fcm_token).delete()
+    db.commit()
+
+def get_all_devices(db: Session):
+    return db.query(models.UserDevice).all()

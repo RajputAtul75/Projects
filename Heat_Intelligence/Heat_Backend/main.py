@@ -16,6 +16,9 @@ from sqlalchemy.orm import Session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uuid
 
+from services.fcm import init_firebase, send_push_notification
+from services.notifier import notifier
+
 def check_heat_alerts():
     """Background task to scan heat zones and generate alerts if risk gets too high."""
     db = SessionLocal()
@@ -49,9 +52,8 @@ async def lifespan(app: FastAPI):
     # Ensure DB tables exist
     Base.metadata.create_all(bind=engine)
 
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(check_heat_alerts, 'interval', minutes=5)
-    scheduler.start()
+    init_firebase()
+    notifier.start()
     
     # Clean up any accidental duplicate seeded zones from previous runs
     db = SessionLocal()
@@ -66,6 +68,9 @@ async def lifespan(app: FastAPI):
         db.close()
         
     yield
+
+    # Graceful shutdown
+    notifier.shutdown()
 
 app = FastAPI(title="Heat Intelligence API", version="1.0.0", lifespan=lifespan)
 
@@ -127,6 +132,11 @@ class AlertModel(BaseModel):
     location_name: str
     timestamp: str
     is_read: bool = False
+
+class DeviceRegistration(BaseModel):
+    fcm_token: str
+    latitude: float
+    longitude: float
 
 
 # --- Endpoints ---
@@ -314,6 +324,19 @@ async def get_alerts_endpoint(db: Session = Depends(get_db)):
         })
         alerts = crud.get_alerts(db)
     return alerts
+
+@app.post("/api/notifications/register")
+async def register_device(registration: DeviceRegistration, db: Session = Depends(get_db)):
+    """Registers a device's FCM token and its location."""
+    crud.upsert_device(db, registration.fcm_token, registration.latitude, registration.longitude)
+    return {"status": "success", "message": "Device registered"}
+
+@app.post("/api/notifications/debug-trigger")
+async def debug_trigger_notification(db: Session = Depends(get_db)):
+    """Manually triggers the risk evaluation and notification process for testing."""
+    from services.risk import evaluate_heat_risks_and_notify
+    evaluate_heat_risks_and_notify(db)
+    return {"status": "success", "message": "Triggered risk evaluation"}
 
 
 @app.get("/", include_in_schema=False)

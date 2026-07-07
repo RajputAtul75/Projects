@@ -39,8 +39,8 @@ dependencies:
   fl_chart: ^0.70.2
 
   # Firebase (notifications)
-  # firebase_core: ^3.12.1
-  # firebase_messaging: ^15.2.4
+  firebase_core: ^3.1.1
+  firebase_messaging: ^15.0.3
   flutter_local_notifications: ^18.0.1
 
   # UI
