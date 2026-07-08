@@ -6,3 +6,4 @@ SQLAlchemy
 APScheduler
 psycopg2-binary
 firebase-admin
+slowapi

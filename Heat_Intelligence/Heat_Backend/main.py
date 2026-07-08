@@ -4,10 +4,25 @@ from typing import Optional, List
 import asyncio
 import time
 
-from fastapi import FastAPI, Query, Depends, HTTPException
+from fastapi import FastAPI, Query, Depends, HTTPException, Request, Security
+from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
+import os
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address)
+API_KEY = os.environ.get("API_KEY", "dev-secret-key-123")
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+def verify_api_key(api_key: str = Security(api_key_header)):
+    if API_KEY != "public" and api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API Key")
+    return api_key
 
 import models, crud
 from database import engine, SessionLocal, Base
@@ -72,7 +87,14 @@ async def lifespan(app: FastAPI):
     # Graceful shutdown
     notifier.shutdown()
 
-app = FastAPI(title="Heat Intelligence API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="Heat Intelligence API", 
+    version="1.0.0", 
+    lifespan=lifespan,
+    dependencies=[Depends(verify_api_key)]
+)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 if __name__ == "__main__":
     import uvicorn
@@ -90,9 +112,10 @@ def get_db():
         db.close()
 
 # Enable CORS for frontend
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -326,7 +349,8 @@ async def get_alerts_endpoint(db: Session = Depends(get_db)):
     return alerts
 
 @app.post("/api/notifications/register")
-async def register_device(registration: DeviceRegistration, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def register_device(request: Request, registration: DeviceRegistration, db: Session = Depends(get_db)):
     """Registers a device's FCM token and its location."""
     crud.upsert_device(db, registration.fcm_token, registration.latitude, registration.longitude)
     return {"status": "success", "message": "Device registered"}

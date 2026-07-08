@@ -23,8 +23,8 @@ class ApiConstants {
   static const String weatherCurrent = '/v1/forecast';
 
   /// Timeouts (ms)
-  static const int connectTimeout = 15000;
-  static const int receiveTimeout = 15000;
+  static const int connectTimeout = 60000;
+  static const int receiveTimeout = 60000;
 
   /// Headers
   static Map<String, String> get defaultHeaders => {
