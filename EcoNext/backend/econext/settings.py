@@ -97,10 +97,10 @@ WSGI_APPLICATION = 'econext.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'econext',         # your database name
-        'USER': 'root',            # your MySQL username
-        'PASSWORD': 'homelander@12345',# your MySQL password
-        'HOST': 'localhost',
+        'NAME': os.getenv('DB_NAME', 'econext'),
+        'USER': os.getenv('DB_USER', 'root'),
+        'PASSWORD': os.getenv('DB_PASSWORD', ''), 
+        'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': '3306',
     }
 }

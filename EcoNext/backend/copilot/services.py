@@ -1,7 +1,15 @@
+"""
+EcoAi service layer — two-pass pipeline using the xAI Grok API.
+
+Pass 1 (MODE 1): Extract structured shopping intent from a raw query.
+Pass 2 (MODE 2): Given intent + real DB candidates, select & explain products.
+
+The Grok API is OpenAI-compatible, so the request/response format is identical.
+"""
+
 import json
 import os
 import re
-from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -9,233 +17,324 @@ import requests
 from django.db.models import Q
 
 from products.models import Product
-from .prompts import QUERY_EXTRACTION_PROMPT, RECOMMENDATION_EXPLANATION_PROMPT
+from .prompts import ECOAI_SYSTEM_PROMPT
 
 
-OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+# ---------------------------------------------------------------------------
+# Grok API helpers
+# ---------------------------------------------------------------------------
+
+def _get_api_config() -> Dict[str, str]:
+    """Read xAI / Grok connection settings from environment."""
+    return {
+        "api_key": os.getenv("XAI_API_KEY", ""),
+        "api_url": os.getenv("XAI_API_URL", "https://api.x.ai/v1/chat/completions"),
+        "model": os.getenv("XAI_MODEL", "grok-3-mini"),
+    }
 
 
-@dataclass
-class StructuredQuery:
-    budget: Optional[int]
-    category: Optional[str]
-    purpose: Optional[str]
-    preferences: List[str]
+def _call_grok(user_message: str, temperature: float = 0) -> str:
+    """Send a chat-completion request to the Grok API and return the reply."""
+    config = _get_api_config()
 
-    def as_dict(self) -> Dict[str, Any]:
-        return {
-            "budget": self.budget,
-            "category": self.category,
-            "purpose": self.purpose,
-            "preferences": self.preferences,
-        }
+    if not config["api_key"]:
+        raise ValueError("XAI_API_KEY environment variable is not set")
+
+    payload = {
+        "model": config["model"],
+        "messages": [
+            {"role": "system", "content": ECOAI_SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        "temperature": temperature,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {config['api_key']}",
+        "Content-Type": "application/json",
+    }
+
+    response = requests.post(
+        config["api_url"], headers=headers, json=payload, timeout=30
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"].strip()
 
 
-def _extract_first_json(text: str) -> Dict[str, Any]:
+def _extract_json(text: str) -> Dict[str, Any]:
+    """Pull the first JSON object out of an LLM response."""
+    # Try fenced code blocks first
+    code_block = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if code_block:
+        return json.loads(code_block.group(1))
+
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1 or end <= start:
-        raise ValueError("No JSON object found")
+        raise ValueError("No JSON object found in Grok response")
     return json.loads(text[start : end + 1])
 
 
-def _fallback_parse_query(query: str) -> StructuredQuery:
+# ---------------------------------------------------------------------------
+# Fallback parser (runs when API key is missing)
+# ---------------------------------------------------------------------------
+
+def _fallback_parse_query(query: str) -> Dict[str, Any]:
+    """Regex-based intent extraction when Grok API is unavailable."""
+    lowered = query.lower()
+
+    # Budget
     budget = None
-    budget_match = re.search(r"(?:under|below|<=?)\s*₹?\s*([\d,]+)|₹\s*([\d,]+)", query, flags=re.IGNORECASE)
+    budget_match = re.search(
+        r"(?:under|below|<=?)\s*₹?\s*([\d,]+)|₹\s*([\d,]+)",
+        query,
+        flags=re.IGNORECASE,
+    )
     if budget_match:
         raw = budget_match.group(1) or budget_match.group(2)
         budget = int(raw.replace(",", ""))
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable not set")
-    model = os.getenv("AI_MODEL") or "gpt-4o-mini"
-    api_url = os.getenv("AI_API_URL") or "https://api.openai.com/v1/chat/completions"
+
+    # Category
     category = None
-    for candidate in ["pc", "laptop", "skincare", "phone", "monitor", "keyboard", "mouse"]:
-        if candidate in lowered:
-            category = "PC" if candidate == "pc" else candidate
+    category_map = {
+        "pc": "Electronics",
+        "laptop": "Electronics",
+        "phone": "Electronics",
+        "monitor": "Electronics",
+        "keyboard": "Electronics",
+        "mouse": "Electronics",
+        "headphone": "Electronics",
+        "skincare": "Beauty & Personal Care",
+        "cosmetic": "Beauty & Personal Care",
+        "lipstick": "Beauty & Personal Care",
+        "grocery": "Grocery",
+        "toy": "Toys & Games",
+        "game": "Toys & Games",
+        "shoe": "Fashion",
+        "shirt": "Fashion",
+    }
+    for keyword, cat in category_map.items():
+        if keyword in lowered:
+            category = cat
             break
 
-    purpose = None
-    for candidate in ["gaming", "coding", "eco-friendly", "office", "study"]:
+    # Build detection
+    is_build = "build" in lowered and any(
+        w in lowered for w in ["pc", "setup", "kit", "routine", "set", "workstation"]
+    )
+
+    component_types = []
+    if is_build and ("pc" in lowered or "computer" in lowered or "workstation" in lowered):
+        component_types = ["CPU", "GPU", "RAM", "Motherboard", "Storage", "PSU", "Cabinet"]
+
+    # Use case
+    use_case = ""
+    for candidate in ["gaming", "coding", "office", "study", "eco-friendly", "sensitive skin"]:
         if candidate in lowered:
-            purpose = candidate
+            use_case = candidate
             break
 
-    preferences = []
-    if "eco" in lowered:
-        preferences.append("eco-friendly")
+    # Keywords (filter out noise words)
+    noise = {"a", "an", "the", "for", "and", "or", "me", "my", "is", "in", "to", "of",
+             "under", "below", "best", "good", "great", "build", "get", "buy", "want", "need"}
+    keywords = [w for w in lowered.split() if len(w) > 2 and w not in noise]
 
-    return StructuredQuery(budget=budget, category=category, purpose=purpose, preferences=preferences)
-
-
-def extract_structured_query(query: str) -> StructuredQuery:
-    api_key = os.getenv("OPENAI_API_KEY")
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-
-    if not api_key:
-        return _fallback_parse_query(query)
-
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": QUERY_EXTRACTION_PROMPT},
-            {"role": "user", "content": query},
-        ],
-        "temperature": 0,
+    return {
+        "budget_max": budget,
+        "category": category or "Unclear",
+        "is_build": is_build,
+        "component_types": component_types,
+        "use_case": use_case,
+        "keywords": keywords[:6],
     }
 
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
-    try:
-        response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=20)
-        response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
-        parsed = _extract_first_json(content)
-        return StructuredQuery(
-            budget=parsed.get("budget"),
-            category=parsed.get("category"),
-            purpose=parsed.get("purpose"),
-            preferences=parsed.get("preferences") or [],
-        )
-    except Exception:
-        return _fallback_parse_query(query)
+# ---------------------------------------------------------------------------
+# Product helpers
+# ---------------------------------------------------------------------------
 
-
-def _relevance_score(product: Product, sq: StructuredQuery) -> float:
-    score = 0.0
-    hay = f"{product.name} {product.description}".lower()
-
-    if sq.purpose and sq.purpose.lower() in hay:
-        score += 2.0
-    for pref in sq.preferences:
-        if pref.lower() in hay:
-            score += 1.0
-
-    # Reuse existing fields as MVP proxies.
-    score += float(product.popularity_score or 0.0) * 0.7
-    score += float(product.sustainability_score or 0.0) * 0.3
-    return score
-
-
-def _product_to_dict(product: Product) -> Dict[str, Any]:
+def _product_to_candidate(product: Product) -> Dict[str, Any]:
+    """Convert a Product to a lightweight dict for the Grok candidates list."""
     return {
+        "product_id": product.id,
+        "name": product.name,
+        "category": product.category.name if product.category_id else None,
+        "price": float(product.current_price),
+        "description": (product.description or "")[:200],
+        "tags": product.tags or [],
+    }
+
+
+def _product_to_response(
+    product: Product, reason: str = "", component: str = ""
+) -> Dict[str, Any]:
+    """Convert a Product to the frontend response dict."""
+    result = {
         "id": product.id,
         "name": product.name,
         "category": product.category.name if product.category_id else None,
         "price": float(product.current_price),
-        "rating": round(float(product.popularity_score or 0.0), 2),
+        "current_price": float(product.current_price),
         "description": product.description,
         "image_url": product.image_url,
+        "reason": reason,
     }
+    if component:
+        result["component"] = component
+    return result
 
 
-def recommend_products(sq: StructuredQuery, top_n: int = 5) -> List[Dict[str, Any]]:
+# ---------------------------------------------------------------------------
+# Pipeline stages
+# ---------------------------------------------------------------------------
+
+def extract_intent(query: str) -> Dict[str, Any]:
+    """MODE 1 — ask Grok to extract structured intent from a raw query."""
+    try:
+        user_message = json.dumps({"query": query})
+        response_text = _call_grok(user_message, temperature=0)
+        return _extract_json(response_text)
+    except Exception as exc:
+        print(f"[EcoAi] Grok intent extraction failed ({exc}), using regex fallback")
+        return _fallback_parse_query(query)
+
+
+def fetch_candidates(intent: Dict[str, Any]) -> List[Product]:
+    """Query the DB for products that could match the extracted intent."""
     products = Product.objects.select_related("category").all()
 
-    if sq.category:
-        cat = sq.category.strip()
+    # Filter by category
+    category = (intent.get("category") or "").strip()
+    if category and category != "Unclear":
         products = products.filter(
-            Q(category__name__icontains=cat)
-            | Q(name__icontains=cat)
-            | Q(description__icontains=cat)
+            Q(category__name__icontains=category)
+            | Q(name__icontains=category)
+            | Q(description__icontains=category)
         )
 
-    if sq.budget is not None:
-        products = products.filter(current_price__lte=Decimal(sq.budget))
+    # Broaden by keywords
+    keywords = intent.get("keywords") or []
+    if keywords and not intent.get("is_build"):
+        kw_q = Q()
+        for kw in keywords:
+            kw_q |= Q(name__icontains=kw) | Q(description__icontains=kw)
+        products = products.filter(kw_q)
 
-    ranked = sorted(products, key=lambda p: _relevance_score(p, sq), reverse=True)
-    return [_product_to_dict(p) for p in ranked[:top_n]]
+    # For builds, also pull in component-type matches
+    if intent.get("is_build") and intent.get("component_types"):
+        comp_q = Q()
+        for comp in intent["component_types"]:
+            comp_q |= Q(name__icontains=comp) | Q(description__icontains=comp)
+        comp_products = Product.objects.select_related("category").filter(comp_q)
 
+        budget = intent.get("budget_max")
+        if budget is not None:
+            comp_products = comp_products.filter(current_price__lte=Decimal(budget))
 
-def build_pc_bundle(sq: StructuredQuery) -> List[Dict[str, Any]]:
-    budget = sq.budget or 80000
-    allocations = {
-        "CPU": 0.22,
-        "GPU": 0.35,
-        "RAM": 0.10,
-        "Motherboard": 0.12,
-        "Storage": 0.10,
-        "PSU": 0.06,
-        "Case": 0.05,
-    }
+        products = (products | comp_products).distinct()
 
-    bundle = []
-    used = 0.0
+    # Budget ceiling
+    budget = intent.get("budget_max")
+    if budget is not None:
+        products = products.filter(current_price__lte=Decimal(budget))
 
-    for part, ratio in allocations.items():
-        part_budget = budget * ratio
-        q = Product.objects.select_related("category").filter(
-            Q(name__icontains=part) | Q(description__icontains=part)
-        )
-        if sq.budget is not None:
-            q = q.filter(current_price__lte=Decimal(part_budget))
-
-        part_products = sorted(q, key=lambda p: _relevance_score(p, sq), reverse=True)
-        if not part_products:
-            continue
-
-        chosen = part_products[0]
-        used += float(chosen.current_price)
-        item = _product_to_dict(chosen)
-        item["component"] = part
-        bundle.append(item)
-
-    if used > budget and bundle:
-        # Simple budget guard for MVP.
-        bundle = sorted(bundle, key=lambda i: i["price"])
-        running = 0.0
-        trimmed = []
-        for item in bundle:
-            if running + item["price"] <= budget:
-                trimmed.append(item)
-                running += item["price"]
-        bundle = trimmed
-
-    return bundle
+    return list(products[:50])
 
 
-def should_return_bundle(sq: StructuredQuery, raw_query: str) -> bool:
-    query = raw_query.lower()
-    return (sq.category or "").lower() == "pc" or "build" in query and "pc" in query
+def get_recommendations(
+    query: str, intent: Dict[str, Any], candidates: List[Product]
+) -> Dict[str, Any]:
+    """MODE 2 — ask Grok to pick the best products from the candidates list."""
+    candidate_dicts = [_product_to_candidate(p) for p in candidates]
 
-
-def generate_ai_response(raw_query: str, sq: StructuredQuery, products: List[Dict[str, Any]], recommendation_type: str) -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
-    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-
-    context = {
-        "query": raw_query,
-        "structured_query": sq.as_dict(),
-        "recommendation_type": recommendation_type,
-        "products": products,
-    }
-
-    if not api_key:
-        if not products:
-            return "I could not find a strong match within your budget. Try increasing budget or broadening category."
-        lines = [
-            f"I found {len(products)} {recommendation_type} recommendation(s) for your request.",
-            "Top picks are ranked by budget fit and relevance.",
-        ]
-        if sq.budget:
-            lines.append(f"All options are within around Rs {sq.budget:,} when possible.")
-        return " ".join(lines)
-
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": RECOMMENDATION_EXPLANATION_PROMPT},
-            {"role": "user", "content": json.dumps(context, ensure_ascii=True)},
-        ],
-        "temperature": 0.4,
-    }
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    user_message = json.dumps(
+        {"query": query, "intent": intent, "candidates": candidate_dicts},
+        ensure_ascii=False,
+    )
 
     try:
-        response = requests.post(OPENAI_API_URL, headers=headers, json=payload, timeout=20)
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
-    except Exception:
-        if not products:
-            return "I could not find a strong match within your budget. Try increasing budget or broadening category."
-        return "Here are the best matches based on your budget and intent, sorted by relevance and product quality signals."
+        response_text = _call_grok(user_message, temperature=0.3)
+        return _extract_json(response_text)
+    except Exception as exc:
+        print(f"[EcoAi] Grok recommendation failed ({exc}), using basic fallback")
+        return _fallback_recommend(candidates, intent)
+
+
+def _fallback_recommend(
+    candidates: List[Product], intent: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Simple fallback when Grok is unreachable in MODE 2."""
+    purpose = intent.get("use_case", "")
+
+    def _score(p: Product) -> float:
+        hay = f"{p.name} {p.description}".lower()
+        s = 0.0
+        if purpose and purpose.lower() in hay:
+            s += 2.0
+        for kw in intent.get("keywords", []):
+            if kw.lower() in hay:
+                s += 1.0
+        s += float(getattr(p, "popularity_score", 0) or 0) * 0.5
+        return s
+
+    ranked = sorted(candidates, key=_score, reverse=True)[:8]
+    budget = intent.get("budget_max")
+    budget_note = f" within ₹{budget:,}" if budget else ""
+
+    return {
+        "selected_items": [
+            {"product_id": p.id, "reason": "Matches your search criteria and budget."}
+            for p in ranked
+        ],
+        "summary": (
+            f"Found {len(ranked)} product(s){budget_note} matching your request. "
+            "Ranked by relevance to your use case."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+def run_ecoai_pipeline(raw_query: str) -> Dict[str, Any]:
+    """
+    Full two-pass EcoAi pipeline:
+      1. Intent Extraction  (MODE 1 — Grok or fallback)
+      2. DB candidate fetch
+      3. Recommendation      (MODE 2 — Grok or fallback)
+      4. Assemble response for the frontend
+    """
+    # --- Pass 1: intent ---
+    intent = extract_intent(raw_query)
+
+    # --- DB lookup ---
+    candidates = fetch_candidates(intent)
+    candidate_map = {p.id: p for p in candidates}
+
+    # --- Pass 2: recommendation ---
+    recommendation = get_recommendations(raw_query, intent, candidates)
+
+    # --- Assemble response ---
+    is_build = intent.get("is_build", False)
+    selected = recommendation.get("selected_items", [])
+
+    products = []
+    for item in selected:
+        pid = item.get("product_id")
+        product = candidate_map.get(pid)
+        if product:
+            products.append(
+                _product_to_response(
+                    product,
+                    reason=item.get("reason", ""),
+                    component=item.get("component_type", "") if is_build else "",
+                )
+            )
+
+    return {
+        "structured_query": intent,
+        "products": products,
+        "ai_response": recommendation.get("summary", ""),
+        "recommendation_type": "bundle" if is_build else "single",
+    }
