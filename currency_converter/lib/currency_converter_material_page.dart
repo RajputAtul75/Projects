@@ -6,13 +6,13 @@ class CurrencyConverterMaterialPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color.fromARGB(255, 244, 129, 129),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
+            const Text(
               '0',
               style: TextStyle(
                 fontSize: 55,
@@ -21,13 +21,28 @@ class CurrencyConverterMaterialPage extends StatelessWidget {
               ),
             ),
             TextField(
-              style: TextStyle(
-                color: Colors.blue,
+              style: const TextStyle(
+                color: Colors.black,
               ),
               decoration: InputDecoration(
                 hintText: 'Please Enter the amount in USD',
-                hintStyle: TextStyle(
-                  color : Colors.white60,
+                hintStyle: const TextStyle(
+                  color : Colors.black,
+                ),
+                prefixIcon: const Icon(Icons.monetization_on),
+                prefixIconColor: Colors.black,
+                filled: true,
+                fillColor: Colors.white,
+                focusedBorder: OutlineInputBorder(
+                  borderSide: const BorderSide(
+                    color: Colors.black,
+                    width: 3.0,
+                    style: BorderStyle.solid,
+                    strokeAlign: BorderSide.strokeAlignOutside,
+                  ),
+                  borderRadius: BorderRadius.
+                    all(Radius.circular((40))
+                  ),
                 ),
               ),
             ),
