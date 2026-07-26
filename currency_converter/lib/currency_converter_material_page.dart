@@ -5,6 +5,15 @@ class CurrencyConverterMaterialPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final border = OutlineInputBorder(
+      borderSide: const BorderSide(
+        color: Colors.black,
+        width: 3.0,
+        style: BorderStyle.solid,
+        strokeAlign: BorderSide.strokeAlignOutside,
+      ),
+      borderRadius: BorderRadius.all(Radius.circular(5)),
+    );
     return Scaffold(
       backgroundColor: const Color.fromARGB(255, 244, 129, 129),
       body: Center(
@@ -27,25 +36,17 @@ class CurrencyConverterMaterialPage extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: 'Please Enter the amount in USD',
                 hintStyle: const TextStyle(
-                  color : Colors.black,
+                  color: Colors.black,
                 ),
                 prefixIcon: const Icon(Icons.monetization_on),
                 prefixIconColor: Colors.black,
                 filled: true,
                 fillColor: Colors.white,
-                focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(
-                    color: Colors.black,
-                    width: 3.0,
-                    style: BorderStyle.solid,
-                    strokeAlign: BorderSide.strokeAlignOutside,
-                  ),
-                  borderRadius: BorderRadius.
-                    all(Radius.circular((40))
-                  ),
-                ),
+                focusedBorder: border,
+                enabledBorder: border,
               ),
             ),
+            
           ],
         ),
       ),
