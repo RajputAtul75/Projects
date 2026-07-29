@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class CurrencyConverterMaterialPage extends StatelessWidget {
@@ -21,36 +22,58 @@ class CurrencyConverterMaterialPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Text(
-              '0',
-              style: TextStyle(
-                fontSize: 55,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            Container(
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.all(10),
+              color: Colors.black,
+              child: const Text(
+                '0',
+                style: TextStyle(
+                  fontSize: 65,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
-            TextField(
-              style: const TextStyle(
-                color: Colors.black,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Please Enter the amount in USD',
-                hintStyle: const TextStyle(
+            Container(
+              padding: const EdgeInsets.all(10.0), 
+              child: TextField(
+                style: const TextStyle(
                   color: Colors.black,
                 ),
-                prefixIcon: const Icon(Icons.monetization_on),
-                prefixIconColor: Colors.black,
-                filled: true,
-                fillColor: Colors.white,
-                focusedBorder: border,
-                enabledBorder: border,
-              ),
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+                decoration: InputDecoration(
+                  hintText: 'Please Enter the amount in USD',
+                  hintStyle: const TextStyle(
+                    color: Colors.black,
+                  ),
+                  prefixIcon: const Icon(Icons.monetization_on),
+                  prefixIconColor: Colors.black,
+                  filled: true,
+                  fillColor: Colors.white,
+                  focusedBorder: border,
+                  enabledBorder: border,
+                ),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
               ),
             ), 
+            //Button
+            TextButton(
+              onPressed: () {
+                if(kDebugMode){
+                  print('Button Clicked');
+                }
+              },
+              style: const ButtonStyle(
+                backgroundColor: WidgetStatePropertyAll(Colors.white),
+                foregroundColor: WidgetStatePropertyAll(Colors.black),
+                fixedSize: WidgetStatePropertyAll(Size(200,50)),
+              ),
+              child: const Text('Convert'),
+            ),
           ],
-        ),
+        ), 
       ),
     );
   }
