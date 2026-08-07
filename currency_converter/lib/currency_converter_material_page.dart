@@ -16,7 +16,7 @@ class CurrencyConverterMaterialPage extends StatelessWidget {
       borderRadius: BorderRadius.all(Radius.circular(5)),
     );
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 244, 129, 129),
+      backgroundColor: const Color.fromARGB(255, 237, 189, 189),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -59,18 +59,23 @@ class CurrencyConverterMaterialPage extends StatelessWidget {
               ),
             ), 
             //Button
-            TextButton(
-              onPressed: () {
-                if(kDebugMode){
-                  print('Button Clicked');
-                }
-              },
-              style: const ButtonStyle(
-                backgroundColor: WidgetStatePropertyAll(Colors.white),
-                foregroundColor: WidgetStatePropertyAll(Colors.black),
-                fixedSize: WidgetStatePropertyAll(Size(200,50)),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: ElevatedButton(
+                onPressed: () {
+                  if(kDebugMode){
+                    print('Button Clicked');
+                  }
+                },
+                style: TextButton.styleFrom(
+                  backgroundColor: (Colors.black),
+                  foregroundColor: (Colors.white),
+                  minimumSize: (Size
+                  (double.infinity,50)),
+                  shape: (RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)))
+                ),
+                child: const Text('Convert'),
               ),
-              child: const Text('Convert'),
             ),
           ],
         ), 
