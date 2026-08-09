@@ -1,7 +1,7 @@
 // API Configuration and Service
 // All API calls go through this centralized service
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000/api';
 
 const handleResponse = async (res) => {
   if (!res.ok && res.status >= 500) {
