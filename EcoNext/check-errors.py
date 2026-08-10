@@ -38,16 +38,22 @@ def check_python_syntax(directory):
 def check_imports(directory):
     """Check if all required packages are installed"""
     print("\n[CHECK 2] Checking Python imports...")
-    required_packages = [
-        'django', 'djangorestframework', 'django-cors-headers',
-        'djangorestframework-simplejwt', 'numpy', 'pandas',
-        'scikit-learn', 'Pillow', 'opencv-python'
-    ]
+    required_packages = {
+        'django': 'django',
+        'djangorestframework': 'rest_framework',
+        'django-cors-headers': 'corsheaders',
+        'djangorestframework-simplejwt': 'rest_framework_simplejwt',
+        'numpy': 'numpy',
+        'pandas': 'pandas',
+        'scikit-learn': 'sklearn',
+        'Pillow': 'PIL',
+        'opencv-python': 'cv2'
+    }
     
     missing = []
-    for package in required_packages:
+    for package, import_name in required_packages.items():
         try:
-            __import__(package.replace('-', '_'))
+            __import__(import_name)
         except ImportError:
             missing.append(package)
     
