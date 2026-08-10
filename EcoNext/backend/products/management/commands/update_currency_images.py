@@ -62,7 +62,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             for product in products:
                 # 1. Convert price to INR
-                if product.current_price < 5000: # Hack to prevent double multiplication if run twice
+                if product.current_price < 300: # USD prices in seed_data are below 300; INR prices in seed_indian are above
                     product.current_price = round(float(product.current_price) * conversion_rate, 2)
                 
                 # 2. Fix image
@@ -78,7 +78,7 @@ class Command(BaseCommand):
             # Update price history too
             histories = PriceHistory.objects.all()
             for history in histories:
-                 if history.price < 5000:
+                 if history.price < 300:
                      history.price = round(float(history.price) * conversion_rate, 2)
                      history.save()
 
