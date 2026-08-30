@@ -1,30 +1,16 @@
+"""REST API endpoints for the product catalogue, search and ML features."""
+
+import logging
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny
 from django.shortcuts import get_object_or_404
+from django.db.models import Count, Q
 from django.utils import timezone
 from datetime import timedelta
-from products.models import Product, Category, ProductSearch, PriceHistory
-from products.serializers import (
-    ProductSerializer, PricePredictionSerializer, SearchResultSerializer,
-    CategorySerializer, PriceHistorySerializer
-)
-from ml_engine.price_predictor import PricePredictor, PricePredictionService
-from ml_engine.visual_search import visual_search_engine
-from ml_engine.intent_search import IntentBasedSearcher
-from ml_engine.models import PricePrediction
-from accounts.models import ActivityLog
-import json
 
-# ============ Product Endpoints ============
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status, viewsets
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from datetime import timedelta
 from products.models import (
     Product, Category, ProductSearch, PriceHistory,
     SubCategory, AgeGroup, GenderCategory, EcoTag, SkinOrBodyFit, Season, Occasion
@@ -37,10 +23,45 @@ from products.serializers import (
 )
 from ml_engine.price_predictor import PricePredictor, PricePredictionService
 from ml_engine.visual_search import visual_search_engine
+from ml_engine.intent_search import IntentBasedSearcher
 from ml_engine.models import PricePrediction
 from accounts.models import ActivityLog
 from personalization.models import UserPreference
-import json
+from personalization.recommendations import RecommendationService
+
+logger = logging.getLogger(__name__)
+
+
+def product_queryset():
+    """Base queryset with the joins ProductSerializer needs.
+
+    ProductSerializer nests eight related objects per product. Without these
+    joins a 50-product page issued hundreds of queries; this collapses it to a
+    small constant number.
+    """
+    return (
+        Product.objects
+        .select_related('category', 'subcategory', 'skin_or_body_fit', 'season', 'occasion')
+        .prefetch_related('age_groups', 'gender_categories', 'eco_tags')
+    )
+
+
+# Only these orderings are accepted, so a caller cannot order by an arbitrary
+# (or nonexistent) column and trigger a database error.
+ALLOWED_SORTS = {
+    '-created_at': '-created_at',
+    'created_at': 'created_at',
+    'price_low': 'current_price',
+    'price_high': '-current_price',
+    'name': 'name',
+    'popular': '-popularity_score',
+    'sustainable': '-sustainability_score',
+    # Accept the raw column names too, for backwards compatibility.
+    'current_price': 'current_price',
+    '-current_price': '-current_price',
+    '-popularity_score': '-popularity_score',
+    '-sustainability_score': '-sustainability_score',
+}
 
 # ============ Personalization-related ViewSets ============
 
@@ -76,183 +97,220 @@ class OccasionViewSet(viewsets.ReadOnlyModelViewSet):
 
 @api_view(['GET'])
 def product_list(request):
-    """Get all products with pagination and filtering"""
-    page = request.GET.get('page', 1)
-    per_page = request.GET.get('per_page', 12)
-    
-    # Filtering
-    products = Product.objects.all()
+    """Get products with pagination and filtering."""
+    products = product_queryset()
+
     age_group = request.query_params.get('age_group')
     gender_category = request.query_params.get('gender_category')
     category = request.query_params.get('category')
     price_min = request.query_params.get('price_min')
     price_max = request.query_params.get('price_max')
     eco_tags = request.query_params.getlist('eco_tags')
-    rating = request.query_params.get('rating')
+    search = request.query_params.get('search') or request.query_params.get('q')
     sort_by = request.query_params.get('sort_by', '-created_at')
 
     if age_group:
-        products = products.filter(age_groups__name=age_group)
+        products = products.filter(age_groups__name__iexact=age_group)
     if gender_category:
-        products = products.filter(gender_categories__name=gender_category)
+        products = products.filter(gender_categories__name__iexact=gender_category)
     if category:
-        products = products.filter(category__name=category)
-    if price_min:
-        products = products.filter(current_price__gte=price_min)
-    if price_max:
-        products = products.filter(current_price__lte=price_max)
+        products = products.filter(category__name__iexact=category)
+    if search:
+        products = products.filter(name__icontains=search)
     if eco_tags:
-        products = products.filter(eco_tags__name__in=eco_tags).distinct()
-    if rating:
-        # Assuming a 'rating' field on Product model, which is not there yet.
-        # Add a 'rating' field to Product model to use this filter.
-        # products = products.filter(rating__gte=rating)
-        pass
+        products = products.filter(eco_tags__name__in=eco_tags)
+    if price_min:
+        try:
+            products = products.filter(current_price__gte=float(price_min))
+        except (TypeError, ValueError):
+            return Response(
+                {'status': 'error', 'message': 'price_min must be a number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    if price_max:
+        try:
+            products = products.filter(current_price__lte=float(price_max))
+        except (TypeError, ValueError):
+            return Response(
+                {'status': 'error', 'message': 'price_max must be a number.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-    products = products.order_by(sort_by)
+    # Joining across the many-to-many filters can duplicate rows.
+    products = products.distinct().order_by(ALLOWED_SORTS.get(sort_by, '-created_at'))
 
+    # Clamp pagination so a bad page/per_page can't error or ask for 10k rows.
     try:
-        start = (int(page) - 1) * int(per_page)
-        end = start + int(per_page)
-        
-        total_count = products.count()
-        products = products[start:end]
-        serializer = ProductSerializer(products, many=True)
-        
-        return Response({
-            'status': 'success',
-            'total_count': total_count,
-            'page': page,
-            'products': serializer.data
-        })
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        page = max(1, int(request.query_params.get('page', 1)))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        per_page = min(100, max(1, int(request.query_params.get('per_page', 12))))
+    except (TypeError, ValueError):
+        per_page = 12
 
-from personalization.recommendations import RecommendationService
+    total_count = products.count()
+    start = (page - 1) * per_page
+    serializer = ProductSerializer(products[start:start + per_page], many=True)
+
+    return Response({
+        'status': 'success',
+        'total_count': total_count,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (total_count + per_page - 1) // per_page,
+        'has_next': start + per_page < total_count,
+        'products': serializer.data,
+    })
+
 
 @api_view(['GET'])
 def personalized_recommendations(request):
-    """Get personalized product recommendations for the logged-in user."""
+    """Recommendations for the logged-in user.
+
+    Falls back to the most popular products if the personalization engine has
+    nothing to work with (a brand new account) or fails outright, so the
+    "Recommended for you" rail is never an error state.
+    """
     if not request.user.is_authenticated:
         return Response(
-            {'error': 'Authentication required'},
+            {'status': 'error', 'message': 'Authentication required'},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
+    source = 'personalized'
+    recommendations = []
     try:
-        recommendation_service = RecommendationService(request.user)
-        recommendations = recommendation_service.get_recommendations()
-        
-        serializer = ProductSerializer(recommendations, many=True)
-        return Response({
-            'status': 'success',
-            'recommendations': serializer.data
-        })
+        recommendations = list(RecommendationService(request.user).get_recommendations())
+    except Exception:
+        logger.exception('Recommendation engine failed for user %s', request.user.pk)
+        recommendations = []
 
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
+    if not recommendations:
+        source = 'popular'
+        recommendations = list(
+            product_queryset().order_by('-popularity_score', '-created_at')[:12]
         )
+
+    return Response({
+        'status': 'success',
+        'source': source,
+        'recommendations': ProductSerializer(recommendations, many=True).data,
+    })
 
 
 
 @api_view(['GET'])
 def product_detail(request, product_id):
-    """Get single product with live price prediction"""
+    """Get a single product, with a live price prediction when one is available."""
+    product = get_object_or_404(product_queryset(), id=product_id)
+
+    if request.user.is_authenticated:
+        ActivityLog.objects.create(user=request.user, action='view', product=product)
+
+    # A failing predictor must not take the product page down with it — the page
+    # is still perfectly useful without the forecast.
+    prediction_data = None
     try:
-        product = get_object_or_404(Product, id=product_id)
-        
-        # Log view activity
-        if request.user.is_authenticated:
-            ActivityLog.objects.create(
-                user=request.user,
-                action='view',
-                product=product
-            )
-        
-        # Compute live prediction
-        service = PricePredictionService()
-        prediction_data = service.predict(product, use_cache=True)
-        
-        product_serializer = ProductSerializer(product)
-        
-        return Response({
-            'status': 'success',
-            'product': product_serializer.data,
-            'price_prediction': prediction_data
-        })
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        prediction_data = PricePredictionService().predict(product, use_cache=True)
+    except Exception:
+        logger.exception('Price prediction failed for product %s', product_id)
+
+    return Response({
+        'status': 'success',
+        'product': ProductSerializer(product).data,
+        'price_prediction': prediction_data,
+    })
 
 
 # ============ Search Endpoints ============
 
 @api_view(['GET'])
 def intent_search(request):
-    """Smart intent-based search"""
-    query = request.GET.get('q', '').strip()
-    
+    """Smart intent-based search, with a plain keyword fallback.
+
+    The intent searcher builds a TF-IDF index using scikit-learn. If that is
+    unavailable or the index is empty, we fall back to a straightforward
+    name/description/tag match rather than returning an error, so search always
+    returns something usable.
+    """
+    query = (request.query_params.get('q') or request.query_params.get('query') or '').strip()
+
     if not query:
         return Response(
-            {'error': 'Search query required'},
+            {'status': 'error', 'message': 'Search query required'},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
+    ProductSearch.objects.create(query=query)
+
+    results = {}
+    source = 'intent'
     try:
-        # Log search
-        ProductSearch.objects.create(query=query)
-        
-        # Perform search
-        searcher = IntentBasedSearcher()
-        categories = searcher.get_category_recommendations(query)
-        
+        categories = IntentBasedSearcher().get_category_recommendations(query)
+        for category, products_data in (categories or {}).items():
+            serialized = SearchResultSerializer(products_data, many=True).data
+            if serialized:
+                results[category] = serialized
+    except Exception:
+        logger.exception('Intent search failed for query %r', query)
         results = {}
-        for category, products_data in categories.items():
-            results[category] = SearchResultSerializer(products_data, many=True).data
-        
-        return Response({
-            'status': 'success',
-            'query': query,
-            'results': results,
-            'total_found': sum(len(v) for v in results.values())
-        })
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+
+    if not results:
+        source = 'keyword'
+        # `tags` is a JSONField, and text lookups against it are not portable
+        # across SQLite and Postgres, so it is deliberately not searched here.
+        matches = product_queryset().filter(
+            Q(name__icontains=query)
+            | Q(description__icontains=query)
+            | Q(category__name__icontains=query)
+            | Q(subcategory__name__icontains=query)
+        ).distinct().order_by('-popularity_score')[:20]
+        if matches:
+            results['Matching products'] = [
+                {
+                    'product': ProductSerializer(product).data,
+                    'similarity_score': 1.0,
+                    'intent_match': 'keyword',
+                }
+                for product in matches
+            ]
+
+    return Response({
+        'status': 'success',
+        'query': query,
+        'source': source,
+        'results': results,
+        'total_found': sum(len(v) for v in results.values()),
+    })
 
 
 @api_view(['GET'])
 def category_browse(request):
-    """Browse by category"""
-    category_id = request.GET.get('id')
-    
-    try:
-        if category_id:
-            category = get_object_or_404(Category, id=category_id)
-            products = category.products.all()
-        else:
-            products = Product.objects.all()
-        
-        serializer = ProductSerializer(products, many=True)
-        
-        return Response({
-            'status': 'success',
-            'products': serializer.data
-        })
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    """List categories, or the products inside one category.
+
+    This endpoint used to return only {'products': [...]}, but the frontend
+    calls it to populate its category navigation and reads response.categories.
+    That mismatch meant the category menu was silently always empty. It now
+    returns both keys: 'categories' always, and 'products' when narrowed by id.
+    """
+    category_id = request.query_params.get('id') or request.query_params.get('category_id')
+
+    categories = Category.objects.all().order_by('name')
+    payload = {
+        'status': 'success',
+        'categories': CategorySerializer(categories, many=True).data,
+    }
+
+    if category_id:
+        category = get_object_or_404(Category, id=category_id)
+        products = product_queryset().filter(category=category).order_by('-created_at')[:100]
+        payload['category'] = CategorySerializer(category).data
+        payload['products'] = ProductSerializer(products, many=True).data
+    else:
+        payload['products'] = []
+
+    return Response(payload)
 
 
 # ============ ML Endpoints ============
@@ -260,115 +318,180 @@ def category_browse(request):
 @api_view(['GET'])
 def price_prediction(request, product_id):
     """Get 7-day price prediction for product — computed live with caching."""
+    product = get_object_or_404(Product, id=product_id)
+
     try:
-        product = get_object_or_404(Product, id=product_id)
-
-        service = PricePredictionService()
-        result = service.predict(product, use_cache=True)
-
+        result = PricePredictionService().predict(product, use_cache=True)
+    except Exception:
+        logger.exception('Price prediction failed for product %s', product_id)
         return Response({
-            'status': 'success',
-            'prediction': result
+            'status': 'unavailable',
+            'message': 'Price prediction is not available for this product yet.',
+            'prediction': None,
         })
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+
+    return Response({
+        'status': 'success',
+        'prediction': result
+    })
 
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def visual_search(request):
-    """Search by image upload"""
+    """Search by image upload.
+
+    The engine prefers CLIP embeddings and falls back to colour-histogram
+    matching when torch/transformers/faiss are not installed. See
+    ml_engine/visual_search.py.
+    """
     if 'image' not in request.FILES:
         return Response(
             {'status': 'error', 'message': 'Image file not provided.'},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
     image_file = request.FILES['image']
 
-    try:
-        # Use the instantiated engine to find similar products
-        similar_products = visual_search_engine.search(image_file, top_k=10)
-        
-        # Serialize the results
-        results = [
-            {
-                'product': ProductSerializer(item['product']).data,
-                'similarity_score': float(item['similarity_score'])
-            }
-            for item in similar_products
-        ]
-        
-        return Response({
-            'status': 'success',
-            'results': results,
-            'total_found': len(results)
-        })
-    except Exception as e:
+    if image_file.size > 10 * 1024 * 1024:
         return Response(
-            {'status': 'error', 'message': f'An error occurred: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            {'status': 'error', 'message': 'Image must be smaller than 10 MB.'},
+            status=status.HTTP_400_BAD_REQUEST
         )
+
+    try:
+        similar_products = visual_search_engine.search(image_file, top_k=10)
+    except Exception:
+        # Log the real traceback server-side; don't hand internals to the client.
+        logger.exception('Visual search failed')
+        return Response(
+            {'status': 'error', 'message': 'Visual search could not process that image.'},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+
+    results = [
+        {
+            'product': ProductSerializer(item['product']).data,
+            'similarity_score': float(item['similarity_score']),
+        }
+        for item in similar_products
+    ]
+
+    return Response({
+        'status': 'success',
+        'results': results,
+        'total_found': len(results),
+    })
 
 
 @api_view(['GET'])
 def trending_now(request):
-    """Get trending products"""
-    try:
-        from site_analytics.models import TrendingProduct
-        
-        trending = TrendingProduct.objects.filter(
-            timestamp__gte=timezone.now() - timedelta(hours=1)
-        ).order_by('rank')[:10]
-        
+    """Get trending products.
+
+    Trending snapshots are written by a Celery beat task. This endpoint used to
+    only read snapshots newer than one hour, so on any install where Celery is
+    not running — which is every install without Redis — the trending section
+    was permanently empty. It now degrades in three steps:
+
+      1. the most recent snapshot batch, whenever it was recorded;
+      2. live counts from the activity log over the last 7 days;
+      3. the catalogue's own popularity score.
+
+    Every tier returns the same shape, so the frontend never has to care which
+    one answered. 'source' says which tier was used.
+    """
+    from django.db.models import Count
+
+    from site_analytics.models import TrendingProduct
+
+    def payload(items, source):
+        return Response({
+            'status': 'success',
+            'source': source,
+            'trending_products': items,
+        })
+
+    # Tier 1 — newest recorded snapshot batch.
+    latest = TrendingProduct.objects.order_by('-timestamp').first()
+    if latest is not None:
+        # Snapshots written in the same run share a timestamp to the second.
+        window_start = latest.timestamp - timedelta(minutes=5)
+        trending = (
+            TrendingProduct.objects
+            .filter(timestamp__gte=window_start)
+            .select_related('product')
+            .order_by('rank')[:10]
+        )
         results = [
             {
                 'product': ProductSerializer(t.product).data,
                 'rank': t.rank,
                 'views': t.views_count,
                 'searches': t.searches_count,
-                'purchases': t.purchase_count
+                'purchases': t.purchase_count,
             }
             for t in trending
         ]
-        
-        return Response({
-            'status': 'success',
-            'trending_products': results
-        })
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        if results:
+            return payload(results, 'snapshot')
+
+    # Tier 2 — compute it live from recent activity.
+    cutoff = timezone.now() - timedelta(days=7)
+    hot_ids = list(
+        ActivityLog.objects
+        .filter(timestamp__gte=cutoff, product__isnull=False, action='view')
+        .values('product')
+        .annotate(views=Count('id'))
+        .order_by('-views')[:10]
+    )
+    if hot_ids:
+        view_counts = {row['product']: row['views'] for row in hot_ids}
+        products = {p.id: p for p in product_queryset().filter(id__in=view_counts)}
+        results = []
+        for rank, product_id in enumerate(view_counts, start=1):
+            product = products.get(product_id)
+            if product is None:
+                continue
+            results.append({
+                'product': ProductSerializer(product).data,
+                'rank': rank,
+                'views': view_counts[product_id],
+                'searches': 0,
+                'purchases': 0,
+            })
+        if results:
+            return payload(results, 'recent_activity')
+
+    # Tier 3 — nothing has happened yet, so fall back to the catalogue itself.
+    products = product_queryset().order_by('-popularity_score', '-created_at')[:10]
+    results = [
+        {
+            'product': ProductSerializer(product).data,
+            'rank': rank,
+            'views': 0,
+            'searches': 0,
+            'purchases': 0,
+        }
+        for rank, product in enumerate(products, start=1)
+    ]
+    return payload(results, 'popularity')
 
 
 # ============ Analytics Endpoints ============
 
 @api_view(['GET'])
 def search_history(request):
-    """Get trending search queries"""
-    try:
-        from django.db.models import Count
-        from datetime import timedelta
-        from django.utils import timezone
-        
-        cutoff = timezone.now() - timedelta(days=7)
-        trending_searches = ProductSearch.objects.filter(
-            timestamp__gte=cutoff
-        ).values('query').annotate(
-            count=Count('id')
-        ).order_by('-count')[:20]
-        
-        return Response({
-            'status': 'success',
-            'trending_searches': list(trending_searches)
-        })
-    except Exception as e:
-        return Response(
-            {'error': str(e)},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    """Get trending search queries from the last 7 days."""
+    cutoff = timezone.now() - timedelta(days=7)
+    trending_searches = (
+        ProductSearch.objects
+        .filter(timestamp__gte=cutoff)
+        .values('query')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:20]
+    )
+
+    return Response({
+        'status': 'success',
+        'trending_searches': list(trending_searches),
+    })

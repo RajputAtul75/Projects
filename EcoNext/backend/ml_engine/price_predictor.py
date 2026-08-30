@@ -371,22 +371,39 @@ class PricePredictionService:
     def _save(
         self, product: Product, predictions: List[float], biz: Dict[str, Any]
     ) -> Optional[PricePrediction]:
-        """Persist prediction row, returning the object or None on error."""
+        """Persist today's prediction, returning the object or None on error.
+
+        This used to INSERT a new row on every uncached prediction, so the table
+        grew by one row per product per page view. There is now at most one row
+        per product per day, which is all the history the UI ever reads.
+        """
+        values = {
+            'day1_price': Decimal(str(round(predictions[0], 2))),
+            'day2_price': Decimal(str(round(predictions[1], 2))),
+            'day3_price': Decimal(str(round(predictions[2], 2))),
+            'day4_price': Decimal(str(round(predictions[3], 2))),
+            'day5_price': Decimal(str(round(predictions[4], 2))),
+            'day6_price': Decimal(str(round(predictions[5], 2))),
+            'day7_price': Decimal(str(round(predictions[6], 2))),
+            'price_change': biz["price_change"],
+            'recommendation': biz["recommendation"],
+            'confidence_score': biz["confidence_score"],
+        }
+
         try:
-            obj = PricePrediction.objects.create(
-                product=product,
-                day1_price=Decimal(str(round(predictions[0], 2))),
-                day2_price=Decimal(str(round(predictions[1], 2))),
-                day3_price=Decimal(str(round(predictions[2], 2))),
-                day4_price=Decimal(str(round(predictions[3], 2))),
-                day5_price=Decimal(str(round(predictions[4], 2))),
-                day6_price=Decimal(str(round(predictions[5], 2))),
-                day7_price=Decimal(str(round(predictions[6], 2))),
-                price_change=biz["price_change"],
-                recommendation=biz["recommendation"],
-                confidence_score=biz["confidence_score"],
-            )
-            return obj
+            # prediction_date uses auto_now_add, so it can only be set on insert;
+            # updating an existing row leaves its original date in place.
+            existing = PricePrediction.objects.filter(
+                product=product, prediction_date=timezone.now().date()
+            ).first()
+
+            if existing is not None:
+                for field, value in values.items():
+                    setattr(existing, field, value)
+                existing.save(update_fields=list(values))
+                return existing
+
+            return PricePrediction.objects.create(product=product, **values)
         except Exception:
             logger.exception("Failed to save PricePrediction for product %s", product.id)
             return None

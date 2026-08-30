@@ -14,6 +14,8 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from products.views import welcome
@@ -63,3 +65,8 @@ urlpatterns = [
     path('api/orders/<int:order_id>/', cart_views.order_detail, name='order_detail'),
     path('api/orders/<int:order_id>/status/', cart_views.update_order_status, name='update_order_status'),
 ]
+
+# Serve uploaded media (visual-search images) from the dev server. In production
+# these are served by the web server or object storage, not Django.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

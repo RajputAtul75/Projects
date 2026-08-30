@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.views.decorators.http import require_http_methods
@@ -72,69 +73,80 @@ def login_view(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def current_user_view(request):
-    """Get current authenticated user"""
-    try:
-        profile = UserProfile.objects.get(user=request.user)
-        return Response({
-            'status': 'success',
-            'user': UserSerializer(request.user).data,
-            'profile': UserProfileSerializer(profile).data
-        }, status=status.HTTP_200_OK)
-    except UserProfile.DoesNotExist:
-        return Response({
-            'status': 'error',
-            'message': 'User profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+    """Get current authenticated user.
+
+    Uses get_or_create because accounts made outside the signup flow (for
+    example via createsuperuser or the admin) have no UserProfile row, and
+    this endpoint used to return 404 for them.
+    """
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    return Response({
+        'status': 'success',
+        'user': UserSerializer(request.user).data,
+        'profile': UserProfileSerializer(profile).data
+    }, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_view(request):
-    """User logout endpoint"""
+    """Log out by blacklisting the caller's refresh token.
+
+    Previously this returned success without invalidating anything, so a
+    "logged out" access token stayed valid for its full 24 hour lifetime.
+    Blacklisting requires 'rest_framework_simplejwt.token_blacklist' in
+    INSTALLED_APPS. Logout is deliberately tolerant: if the client cannot
+    supply a refresh token we still report success so it can clear its own
+    state, but we report whether the token was actually revoked.
+    """
+    refresh_token = request.data.get('refresh') or request.data.get('refresh_token')
+    revoked = False
+
+    if refresh_token:
+        try:
+            RefreshToken(refresh_token).blacklist()
+            revoked = True
+        except TokenError:
+            # Already expired, already blacklisted, or malformed — nothing to do.
+            revoked = False
+
     return Response({
         'status': 'success',
-        'message': 'Logout successful'
+        'message': 'Logout successful',
+        'token_revoked': revoked,
     }, status=status.HTTP_200_OK)
 
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_profile_view(request):
-    """Update user profile"""
-    try:
-        profile = UserProfile.objects.get(user=request.user)
-        
-        # Update user fields
-        user = request.user
-        if 'first_name' in request.data:
-            user.first_name = request.data['first_name']
-        if 'last_name' in request.data:
-            user.last_name = request.data['last_name']
-        if 'email' in request.data:
-            user.email = request.data['email']
-        user.save()
-        
-        # Update profile fields
-        if 'phone' in request.data:
-            profile.phone = request.data['phone']
-        if 'address' in request.data:
-            profile.address = request.data['address']
-        if 'city' in request.data:
-            profile.city = request.data['city']
-        if 'country' in request.data:
-            profile.country = request.data['country']
-        if 'zipcode' in request.data:
-            profile.zipcode = request.data['zipcode']
-        if 'state' in request.data:
-            profile.state = request.data['state']
-        profile.save()
-        
-        return Response({
-            'status': 'success',
-            'message': 'Profile updated successfully',
-            'user': UserSerializer(user).data,
-            'profile': UserProfileSerializer(profile).data
-        }, status=status.HTTP_200_OK)
-    except UserProfile.DoesNotExist:
-        return Response({
-            'status': 'error',
-            'message': 'User profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+    """Update the authenticated user's account and profile fields."""
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    user = request.user
+
+    # Guard email uniqueness — this endpoint previously let two accounts end up
+    # sharing an address even though signup forbids it.
+    email = request.data.get('email')
+    if email and email != user.email:
+        if User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists():
+            return Response({
+                'status': 'error',
+                'message': 'That email address is already in use.',
+                'errors': {'email': 'Already in use'},
+            }, status=status.HTTP_400_BAD_REQUEST)
+        user.email = email
+
+    for field in ('first_name', 'last_name'):
+        if field in request.data:
+            setattr(user, field, request.data[field])
+    user.save()
+
+    for field in ('phone', 'address', 'city', 'country', 'zipcode', 'state'):
+        if field in request.data:
+            setattr(profile, field, request.data[field])
+    profile.save()
+
+    return Response({
+        'status': 'success',
+        'message': 'Profile updated successfully',
+        'user': UserSerializer(user).data,
+        'profile': UserProfileSerializer(profile).data
+    }, status=status.HTTP_200_OK)

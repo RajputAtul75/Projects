@@ -1,17 +1,5 @@
 from rest_framework import serializers
-from products.models import Product, Category, PriceHistory, ProductSearch
-from accounts.models import UserProfile, ActivityLog
-from shop_cart.models import Cart, CartItem
-from order_service.models import Order, OrderItem
-from ml_engine.models import PricePrediction
 
-class CategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Category
-        fields = ['id', 'name', 'description']
-
-
-from rest_framework import serializers
 from products.models import (
     Product, Category, PriceHistory, ProductSearch,
     SubCategory, AgeGroup, GenderCategory, EcoTag, SkinOrBodyFit, Season, Occasion
@@ -20,6 +8,7 @@ from accounts.models import UserProfile, ActivityLog
 from shop_cart.models import Cart, CartItem
 from order_service.models import Order, OrderItem
 from ml_engine.models import PricePrediction
+
 
 class AgeGroupSerializer(serializers.ModelSerializer):
     class Meta:
@@ -64,14 +53,18 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    category = CategorySerializer()
-    subcategory = SubCategorySerializer()
-    age_groups = AgeGroupSerializer(many=True)
-    gender_categories = GenderCategorySerializer(many=True)
-    eco_tags = EcoTagSerializer(many=True)
-    skin_or_body_fit = SkinOrBodyFitSerializer()
-    season = SeasonSerializer()
-    occasion = OccasionSerializer()
+    # All nested relations are read_only: this serializer is only ever used for
+    # output, and marking them explicitly stops DRF from demanding nested write
+    # payloads. Callers should use product_queryset() in products/api_views.py,
+    # which prefetches exactly these eight relations.
+    category = CategorySerializer(read_only=True)
+    subcategory = SubCategorySerializer(read_only=True)
+    age_groups = AgeGroupSerializer(many=True, read_only=True)
+    gender_categories = GenderCategorySerializer(many=True, read_only=True)
+    eco_tags = EcoTagSerializer(many=True, read_only=True)
+    skin_or_body_fit = SkinOrBodyFitSerializer(read_only=True)
+    season = SeasonSerializer(read_only=True)
+    occasion = OccasionSerializer(read_only=True)
 
     class Meta:
         model = Product
@@ -100,7 +93,7 @@ class PricePredictionSerializer(serializers.ModelSerializer):
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    product = ProductSerializer()
+    product = ProductSerializer(read_only=True)
     subtotal = serializers.SerializerMethodField()
     
     class Meta:
@@ -112,7 +105,7 @@ class CartItemSerializer(serializers.ModelSerializer):
 
 
 class CartSerializer(serializers.ModelSerializer):
-    items = CartItemSerializer(many=True)
+    items = CartItemSerializer(many=True, read_only=True)
     total = serializers.SerializerMethodField()
     
     class Meta:
@@ -124,7 +117,7 @@ class CartSerializer(serializers.ModelSerializer):
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
-    product = ProductSerializer()
+    product = ProductSerializer(read_only=True)
     subtotal = serializers.SerializerMethodField()
     
     class Meta:
@@ -136,7 +129,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 
 class OrderSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer(many=True)
+    items = OrderItemSerializer(many=True, read_only=True)
     
     class Meta:
         model = Order

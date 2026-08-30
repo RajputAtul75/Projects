@@ -1,21 +1,48 @@
+# EcoNext backend dependencies
+#
+# Everything listed here is actually imported by the project. Install with:
+#   pip install -r requirements.txt
+#
+# With no DATABASE_URL or DB_ENGINE set, the project runs on SQLite and needs no
+# database server at all — see econext/settings.py.
+
+# --- Core framework ---
 Django==5.1.6
-django-cors-headers==4.3.1
-djangorestframework==3.14.0
+djangorestframework>=3.15.2          # 3.15 is the first release supporting Django 5.x
 djangorestframework-simplejwt==5.5.1
-django-redis==5.4.0
-mysqlclient>=2.2.7
+django-cors-headers==4.3.1
+django-filter==24.2
 python-dotenv==1.0.0
-celery==5.3.4
-redis==5.0.1
-numpy>=1.26.0
-pandas>=2.1.0
-scikit-learn>=1.4.0
-Pillow>=10.1.0
-opencv-python>=4.8.0
-requests>=2.31.0
+
+# --- Serving / static files ---
 gunicorn>=21.2.0
 whitenoise>=6.6.0
-streamlit>=1.32.0
-django-filter==24.2
+
+# --- Database drivers ---
 dj-database-url==3.1.2
-psycopg2-binary==2.9.12
+psycopg2-binary==2.9.12              # only needed when using PostgreSQL
+# mysqlclient>=2.2.7                 # optional: needs MySQL client headers to build.
+#                                    # Uncomment only if DB_ENGINE targets MySQL.
+
+# --- Machine learning (price prediction, intent search, auto-tagging) ---
+numpy>=1.26.0
+scikit-learn>=1.4.0
+Pillow>=10.1.0                       # image decoding for visual search
+
+# --- HTTP client (product images, xAI Grok copilot) ---
+requests>=2.31.0
+
+# --- Optional: background tasks and Redis cache ---
+# Both are opt-in. Caching falls back to local memory when USE_REDIS is unset,
+# and trending falls back to live queries when no Celery worker is running.
+celery==5.3.4
+redis==5.0.1
+django-redis==5.4.0
+
+# --- Optional: real CLIP visual search ---
+# The visual search engine uses colour-histogram matching out of the box and
+# automatically upgrades to CLIP embeddings if these are installed. They are
+# left out by default because they add several gigabytes.
+# torch>=2.2.0
+# transformers>=4.38.0
+# faiss-cpu>=1.8.0

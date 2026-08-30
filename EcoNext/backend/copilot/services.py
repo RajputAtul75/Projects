@@ -8,16 +8,19 @@ The Grok API is OpenAI-compatible, so the request/response format is identical.
 """
 
 import json
+import logging
 import os
 import re
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import requests
 from django.db.models import Q
 
 from products.models import Product
 from .prompts import ECOAI_SYSTEM_PROMPT
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -195,50 +198,63 @@ def extract_intent(query: str) -> Dict[str, Any]:
         response_text = _call_grok(user_message, temperature=0)
         return _extract_json(response_text)
     except Exception as exc:
-        print(f"[EcoAi] Grok intent extraction failed ({exc}), using regex fallback")
+        logger.info('EcoAi intent extraction via Grok failed (%s); using regex fallback', exc)
         return _fallback_parse_query(query)
 
 
 def fetch_candidates(intent: Dict[str, Any]) -> List[Product]:
-    """Query the DB for products that could match the extracted intent."""
-    products = Product.objects.select_related("category").all()
+    """Query the DB for products that could match the extracted intent.
 
-    # Filter by category
+    Filters are applied progressively and each one is only kept if it still
+    leaves something to recommend. Stacking category AND keywords AND budget
+    unconditionally used to return zero rows for most real queries, which made
+    the copilot look broken even though it was working exactly as written.
+    """
+    base = Product.objects.select_related("category")
+    products = base.all()
+
+    def narrow(queryset, condition):
+        narrowed = queryset.filter(condition)
+        return narrowed if narrowed.exists() else queryset
+
     category = (intent.get("category") or "").strip()
     if category and category != "Unclear":
-        products = products.filter(
+        products = narrow(products, (
             Q(category__name__icontains=category)
             | Q(name__icontains=category)
             | Q(description__icontains=category)
-        )
+        ))
 
-    # Broaden by keywords
-    keywords = intent.get("keywords") or []
+    keywords = [kw for kw in (intent.get("keywords") or []) if kw]
     if keywords and not intent.get("is_build"):
         kw_q = Q()
         for kw in keywords:
             kw_q |= Q(name__icontains=kw) | Q(description__icontains=kw)
-        products = products.filter(kw_q)
+        products = narrow(products, kw_q)
 
-    # For builds, also pull in component-type matches
+    budget = intent.get("budget_max")
+
+    # For builds, also pull in component-type matches.
     if intent.get("is_build") and intent.get("component_types"):
         comp_q = Q()
         for comp in intent["component_types"]:
             comp_q |= Q(name__icontains=comp) | Q(description__icontains=comp)
-        comp_products = Product.objects.select_related("category").filter(comp_q)
-
-        budget = intent.get("budget_max")
+        comp_products = base.filter(comp_q)
         if budget is not None:
             comp_products = comp_products.filter(current_price__lte=Decimal(budget))
+        if comp_products.exists():
+            products = (products | comp_products).distinct()
 
-        products = (products | comp_products).distinct()
-
-    # Budget ceiling
-    budget = intent.get("budget_max")
     if budget is not None:
-        products = products.filter(current_price__lte=Decimal(budget))
+        products = narrow(products, Q(current_price__lte=Decimal(budget)))
 
-    return list(products[:50])
+    candidates = list(products.order_by("-popularity_score")[:50])
+
+    # Absolute last resort: show the catalogue's best rather than nothing.
+    if not candidates:
+        candidates = list(base.order_by("-popularity_score", "-created_at")[:20])
+
+    return candidates
 
 
 def get_recommendations(
@@ -256,7 +272,7 @@ def get_recommendations(
         response_text = _call_grok(user_message, temperature=0.3)
         return _extract_json(response_text)
     except Exception as exc:
-        print(f"[EcoAi] Grok recommendation failed ({exc}), using basic fallback")
+        logger.info('EcoAi recommendation via Grok failed (%s); using scoring fallback', exc)
         return _fallback_recommend(candidates, intent)
 
 
@@ -332,9 +348,31 @@ def run_ecoai_pipeline(raw_query: str) -> Dict[str, Any]:
                 )
             )
 
+    ai_response = recommendation.get("summary", "")
+
+    # The model can hallucinate product ids that aren't in the candidate list,
+    # which left the response with a summary but no products. Fall back to the
+    # top candidates so the user always sees something to click.
+    if not products and candidates:
+        products = [
+            _product_to_response(p, reason="Closest match in our catalogue.")
+            for p in candidates[:8]
+        ]
+        if not ai_response:
+            ai_response = (
+                f"Here are the {len(products)} closest matches in our catalogue "
+                "for what you described."
+            )
+
+    if not products and not ai_response:
+        ai_response = (
+            "I couldn't find anything matching that yet. Try describing the "
+            "product type or giving a budget, for example \"running shoes under 3000\"."
+        )
+
     return {
         "structured_query": intent,
         "products": products,
-        "ai_response": recommendation.get("summary", ""),
+        "ai_response": ai_response,
         "recommendation_type": "bundle" if is_build else "single",
     }

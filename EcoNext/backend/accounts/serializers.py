@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import UserProfile
 
 class UserSerializer(serializers.ModelSerializer):
@@ -27,13 +29,21 @@ class SignUpSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if data['password'] != data.pop('password_confirm'):
             raise serializers.ValidationError({'password': 'Passwords do not match'})
-        
-        if User.objects.filter(username=data['username']).exists():
+
+        if User.objects.filter(username__iexact=data['username']).exists():
             raise serializers.ValidationError({'username': 'Username already exists'})
-        
-        if User.objects.filter(email=data['email']).exists():
+
+        if User.objects.filter(email__iexact=data['email']).exists():
             raise serializers.ValidationError({'email': 'Email already exists'})
-        
+
+        # AUTH_PASSWORD_VALIDATORS was configured in settings but never actually
+        # run, because create_user() bypasses it. Enforce it here so minimum
+        # length, common-password and numeric-only rules apply at signup.
+        try:
+            validate_password(data['password'])
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'password': list(exc.messages)})
+
         return data
 
     def create(self, validated_data):
