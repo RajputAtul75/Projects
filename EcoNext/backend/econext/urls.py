@@ -22,6 +22,7 @@ from products.views import welcome
 from shop_cart import api_views as cart_views
 from personalization.views import UserPreferenceViewSet
 from kids_products.views import KidsProductViewSet
+from copilot.views import ChatAPIView
 
 urlpatterns = [
     path('', welcome, name='welcome'),
@@ -31,6 +32,7 @@ urlpatterns = [
     path('api/', include('accounts.urls')),
     path('api/products/', include('products.urls')),
     path('api/copilot/', include('copilot.urls')),
+    path('api/chat/', ChatAPIView.as_view(), name='chat-endpoint'),
     path(
         'api/personalization/preferences/',
         UserPreferenceViewSet.as_view({'get': 'list', 'post': 'create'}),

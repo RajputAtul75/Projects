@@ -10,7 +10,8 @@ import ProfilePage from './ProfilePage';
 import {
   AnimatedButton,
   ProductCard,
-  HeroSection
+  HeroSection,
+  ChatAssistant
 } from './components';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -25,7 +26,6 @@ import TeensPage from './pages/TeensPage';
 import MenPage from './pages/MenPage';
 import WomenPage from './pages/WomenPage';
 import UnisexPage from './pages/UnisexPage';
-import EcoAiPage from './pages/CopilotPage';
 import PreferenceForm from './components/personalization/PreferenceForm';
 import RecommendationWidget from './components/personalization/RecommendationWidget';
 
@@ -292,7 +292,6 @@ function App() {
             <li><a href="#men" onClick={(e) => { e.preventDefault(); navigateTo('men'); }}>Men</a></li>
             <li><a href="#women" onClick={(e) => { e.preventDefault(); navigateTo('women'); }}>Women</a></li>
             <li><a href="#unisex" onClick={(e) => { e.preventDefault(); navigateTo('unisex'); }}>Unisex</a></li>
-            <li><a href="#ecoai" onClick={(e) => { e.preventDefault(); navigateTo('ecoai'); }}>EcoAi</a></li>
             <li><a href="#preferences" onClick={(e) => { e.preventDefault(); navigateTo('preferences'); }}>Preferences</a></li>
             <li><a href="#cart" onClick={(e) => { e.preventDefault(); navigateTo('cart'); }}>🛒 Cart ({cart.length})</a></li>
 
@@ -594,13 +593,6 @@ function App() {
           <PreferenceForm />
         )}
 
-        {(currentPage === 'ecoai' || currentPage === 'copilot') && (
-          <EcoAiPage
-            onViewDetails={(productId) => navigateTo(`product-${productId}`)}
-            onAddToCart={handleAddToCart}
-          />
-        )}
-
         {/* Product Detail Page */}
         {currentPage && currentPage.startsWith('product-') && (
           <ProductDetailView
@@ -793,6 +785,10 @@ function App() {
         )}
 
       </div>
+      
+      {currentPage === 'home' && (
+        <ChatAssistant onViewDetails={(productId) => navigateTo(`product-${productId}`)} />
+      )}
     </div>
   );
 }

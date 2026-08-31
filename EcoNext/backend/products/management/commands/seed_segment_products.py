@@ -236,7 +236,7 @@ class Command(BaseCommand):
                 price = Decimal(str(random.randint(min_price, max_price)))
                 stock = random.randint(20, 300)
 
-                product_name = f"{segment_name} {item['name']}"
+                product_name = item["name"]
 
                 # Use real Unsplash image URL
                 image_url = SEGMENT_IMAGES[segment_name][item["name"]]

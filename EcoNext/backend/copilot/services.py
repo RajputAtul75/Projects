@@ -1,10 +1,10 @@
 """
-EcoAi service layer — two-pass pipeline using the xAI Grok API.
+EcoAi service layer — two-pass pipeline using the Google Gemini API.
 
 Pass 1 (MODE 1): Extract structured shopping intent from a raw query.
 Pass 2 (MODE 2): Given intent + real DB candidates, select & explain products.
 
-The Grok API is OpenAI-compatible, so the request/response format is identical.
+The Gemini API is accessed via its OpenAI compatibility layer, so the request/response format is identical.
 """
 
 import json
@@ -24,24 +24,24 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Grok API helpers
+# Gemini API helpers
 # ---------------------------------------------------------------------------
 
 def _get_api_config() -> Dict[str, str]:
-    """Read xAI / Grok connection settings from environment."""
+    """Read Gemini connection settings from environment."""
     return {
-        "api_key": os.getenv("XAI_API_KEY", ""),
-        "api_url": os.getenv("XAI_API_URL", "https://api.x.ai/v1/chat/completions"),
-        "model": os.getenv("XAI_MODEL", "grok-3-mini"),
+        "api_key": os.getenv("GEMINI_API_KEY", ""),
+        "api_url": os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"),
+        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
     }
 
 
-def _call_grok(user_message: str, temperature: float = 0) -> str:
-    """Send a chat-completion request to the Grok API and return the reply."""
+def _call_gemini(user_message: str, temperature: float = 0) -> str:
+    """Send a chat-completion request to the Gemini API and return the reply."""
     config = _get_api_config()
 
     if not config["api_key"]:
-        raise ValueError("XAI_API_KEY environment variable is not set")
+        raise ValueError("GEMINI_API_KEY environment variable is not set")
 
     payload = {
         "model": config["model"],
@@ -74,7 +74,7 @@ def _extract_json(text: str) -> Dict[str, Any]:
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1 or end <= start:
-        raise ValueError("No JSON object found in Grok response")
+        raise ValueError("No JSON object found in Gemini response")
     return json.loads(text[start : end + 1])
 
 
@@ -83,7 +83,7 @@ def _extract_json(text: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _fallback_parse_query(query: str) -> Dict[str, Any]:
-    """Regex-based intent extraction when Grok API is unavailable."""
+    """Regex-based intent extraction when Gemini API is unavailable."""
     lowered = query.lower()
 
     # Budget
@@ -157,7 +157,7 @@ def _fallback_parse_query(query: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 def _product_to_candidate(product: Product) -> Dict[str, Any]:
-    """Convert a Product to a lightweight dict for the Grok candidates list."""
+    """Convert a Product to a lightweight dict for the Gemini candidates list."""
     return {
         "product_id": product.id,
         "name": product.name,
@@ -192,13 +192,13 @@ def _product_to_response(
 # ---------------------------------------------------------------------------
 
 def extract_intent(query: str) -> Dict[str, Any]:
-    """MODE 1 — ask Grok to extract structured intent from a raw query."""
+    """MODE 1 — ask Gemini to extract structured intent from a raw query."""
     try:
         user_message = json.dumps({"query": query})
-        response_text = _call_grok(user_message, temperature=0)
+        response_text = _call_gemini(user_message, temperature=0)
         return _extract_json(response_text)
     except Exception as exc:
-        logger.info('EcoAi intent extraction via Grok failed (%s); using regex fallback', exc)
+        logger.info('EcoAi intent extraction via Gemini failed (%s); using regex fallback', exc)
         return _fallback_parse_query(query)
 
 
@@ -260,7 +260,7 @@ def fetch_candidates(intent: Dict[str, Any]) -> List[Product]:
 def get_recommendations(
     query: str, intent: Dict[str, Any], candidates: List[Product]
 ) -> Dict[str, Any]:
-    """MODE 2 — ask Grok to pick the best products from the candidates list."""
+    """MODE 2 — ask Gemini to pick the best products from the candidates list."""
     candidate_dicts = [_product_to_candidate(p) for p in candidates]
 
     user_message = json.dumps(
@@ -269,17 +269,17 @@ def get_recommendations(
     )
 
     try:
-        response_text = _call_grok(user_message, temperature=0.3)
+        response_text = _call_gemini(user_message, temperature=0.3)
         return _extract_json(response_text)
     except Exception as exc:
-        logger.info('EcoAi recommendation via Grok failed (%s); using scoring fallback', exc)
+        logger.info('EcoAi recommendation via Gemini failed (%s); using scoring fallback', exc)
         return _fallback_recommend(candidates, intent)
 
 
 def _fallback_recommend(
     candidates: List[Product], intent: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """Simple fallback when Grok is unreachable in MODE 2."""
+    """Simple fallback when Gemini is unreachable in MODE 2."""
     purpose = intent.get("use_case", "")
 
     def _score(p: Product) -> float:
@@ -316,9 +316,9 @@ def _fallback_recommend(
 def run_ecoai_pipeline(raw_query: str) -> Dict[str, Any]:
     """
     Full two-pass EcoAi pipeline:
-      1. Intent Extraction  (MODE 1 — Grok or fallback)
+      1. Intent Extraction  (MODE 1 — Gemini or fallback)
       2. DB candidate fetch
-      3. Recommendation      (MODE 2 — Grok or fallback)
+      3. Recommendation      (MODE 2 — Gemini or fallback)
       4. Assemble response for the frontend
     """
     # --- Pass 1: intent ---

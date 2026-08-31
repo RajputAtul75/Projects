@@ -12,21 +12,18 @@ from django.utils import timezone
 from datetime import timedelta
 
 from products.models import (
-    Product, Category, ProductSearch, PriceHistory,
+    Product, Category, ProductSearch,
     SubCategory, AgeGroup, GenderCategory, EcoTag, SkinOrBodyFit, Season, Occasion
 )
 from products.serializers import (
-    ProductSerializer, PricePredictionSerializer, SearchResultSerializer,
-    CategorySerializer, PriceHistorySerializer, SubCategorySerializer,
-    AgeGroupSerializer, GenderCategorySerializer, EcoTagSerializer,
-    SkinOrBodyFitSerializer, SeasonSerializer, OccasionSerializer
+    ProductSerializer, SearchResultSerializer, CategorySerializer,
+    SubCategorySerializer, AgeGroupSerializer, GenderCategorySerializer,
+    EcoTagSerializer, SkinOrBodyFitSerializer, SeasonSerializer, OccasionSerializer
 )
-from ml_engine.price_predictor import PricePredictor, PricePredictionService
+from ml_engine.price_predictor import PricePredictionService
 from ml_engine.visual_search import visual_search_engine
 from ml_engine.intent_search import IntentBasedSearcher
-from ml_engine.models import PricePrediction
 from accounts.models import ActivityLog
-from personalization.models import UserPreference
 from personalization.recommendations import RecommendationService
 
 logger = logging.getLogger(__name__)
@@ -369,7 +366,7 @@ def visual_search(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE
         )
 
-    results = [
+    raw_results = [
         {
             'product': ProductSerializer(item['product']).data,
             'similarity_score': float(item['similarity_score']),
@@ -377,6 +374,15 @@ def visual_search(request):
         for item in similar_products
     ]
 
+    # Deduplicate by product name to prevent showing visually identical items
+    # across different categories (e.g. Kids, Men) multiple times.
+    seen_names = set()
+    results = []
+    for r in raw_results:
+        name = r['product']['name']
+        if name not in seen_names:
+            seen_names.add(name)
+            results.append(r)
     return Response({
         'status': 'success',
         'results': results,
@@ -400,8 +406,6 @@ def trending_now(request):
     Every tier returns the same shape, so the frontend never has to care which
     one answered. 'source' says which tier was used.
     """
-    from django.db.models import Count
-
     from site_analytics.models import TrendingProduct
 
     def payload(items, source):
@@ -411,27 +415,52 @@ def trending_now(request):
             'trending_products': items,
         })
 
-    # Tier 1 — newest recorded snapshot batch.
+    # Tier 1 — newest recorded snapshot.
+    #
+    # Snapshots cannot be filtered by a simple time window: the generator has
+    # been run more than once, and two runs seconds apart each write their own
+    # rank 1..N. Any window wide enough to catch one whole run also catches the
+    # previous one, which produced duplicate ranks and repeated products. So
+    # instead we keep the newest row *per product* and re-rank from scratch.
     latest = TrendingProduct.objects.order_by('-timestamp').first()
     if latest is not None:
-        # Snapshots written in the same run share a timestamp to the second.
-        window_start = latest.timestamp - timedelta(minutes=5)
-        trending = (
+        newest_per_product = {}
+        rows = (
             TrendingProduct.objects
-            .filter(timestamp__gte=window_start)
-            .select_related('product')
-            .order_by('rank')[:10]
+            .order_by('-timestamp')
+            .values('product_id', 'rank', 'views_count', 'searches_count', 'purchase_count')[:200]
         )
-        results = [
-            {
-                'product': ProductSerializer(t.product).data,
-                'rank': t.rank,
-                'views': t.views_count,
-                'searches': t.searches_count,
-                'purchases': t.purchase_count,
-            }
-            for t in trending
-        ]
+        for row in rows:
+            if row['product_id'] is not None and row['product_id'] not in newest_per_product:
+                newest_per_product[row['product_id']] = row
+
+        ranked = sorted(
+            newest_per_product.values(),
+            key=lambda row: (row['rank'], -row['views_count']),
+        )[:10]
+
+        # ProductSerializer would otherwise fetch each product's eight relations
+        # one at a time, so the products are loaded through product_queryset()
+        # in a single query.
+        products = {
+            product.id: product
+            for product in product_queryset().filter(
+                id__in=[row['product_id'] for row in ranked]
+            )
+        }
+
+        results = []
+        for position, row in enumerate(ranked, start=1):
+            product = products.get(row['product_id'])
+            if product is None:
+                continue
+            results.append({
+                'product': ProductSerializer(product).data,
+                'rank': position,
+                'views': row['views_count'],
+                'searches': row['searches_count'],
+                'purchases': row['purchase_count'],
+            })
         if results:
             return payload(results, 'snapshot')
 

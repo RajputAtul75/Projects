@@ -5,8 +5,9 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .serializers import CopilotRequestSerializer
+from .serializers import CopilotRequestSerializer, ChatRequestSerializer
 from .services import run_ecoai_pipeline
+from .chat_service import run_chat_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -57,4 +58,28 @@ class CopilotAPIView(APIView):
                 status=status.HTTP_200_OK,
             )
 
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class ChatAPIView(APIView):
+    """
+    Handles conversation-based interactions for the EcoNext AI shopping assistant.
+    Expects {"message": str, "history": list}.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ChatRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        message = serializer.validated_data["message"].strip()
+        history = serializer.validated_data.get("history", [])
+        
+        if not message:
+            return Response(
+                {"success": False, "reply": "Please say something!", "products": []},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        result = run_chat_pipeline(message, history)
         return Response(result, status=status.HTTP_200_OK)
