@@ -32,7 +32,7 @@ def _get_api_config() -> Dict[str, str]:
     return {
         "api_key": os.getenv("GEMINI_API_KEY", ""),
         "api_url": os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"),
-        "model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        "model": os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
     }
 
 
