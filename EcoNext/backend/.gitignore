@@ -60,3 +60,4 @@ celerybeat-schedule
 *.h5
 *.pth
 *.model
+test.jpg

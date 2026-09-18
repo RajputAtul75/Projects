@@ -5,7 +5,7 @@ class Command(BaseCommand):
     help = 'Update all products with high-quality working product images'
 
     def handle(self, *args, **options):
-        self.stdout.write("🖼️  Updating product images...")
+        self.stdout.write("Updating product images...")
 
         # Map product names to specific, reliable Unsplash images
         image_map = {
@@ -100,7 +100,7 @@ class Command(BaseCommand):
             if product.name in image_map:
                 product.image_url = image_map[product.name]
                 product.save(update_fields=['image_url'])
-                self.stdout.write(f"  ✓ {product.name}")
+                self.stdout.write(f"  OK {product.name}")
                 updated += 1
             elif not product.image_url:
                 # Fallback: assign category-based image
@@ -117,7 +117,7 @@ class Command(BaseCommand):
                 }
                 product.image_url = fallbacks.get(cat, 'https://images.unsplash.com/photo-1472851294608-062f824d29cc?w=800&auto=format&fit=crop')
                 product.save(update_fields=['image_url'])
-                self.stdout.write(f"  ✓ {product.name} (fallback)")
+                self.stdout.write(f"  OK {product.name} (fallback)")
                 updated += 1
 
-        self.stdout.write(self.style.SUCCESS(f'\n✅ Updated images for {updated} products!'))
+        self.stdout.write(self.style.SUCCESS(f'\nUpdated images for {updated} products!'))

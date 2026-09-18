@@ -738,7 +738,7 @@ function App() {
 
                 <div style={{ background: 'white', borderRadius: '12px', padding: '2rem', boxShadow: 'var(--shadow-md)' }}>
                   <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--primary)', marginBottom: '1.5rem', textAlign: 'center' }}>
-                    Total: ₹{cartTotal.toFixed(2)}
+                    Total: ₹{cartTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <AnimatedButton
                     onClick={() => {

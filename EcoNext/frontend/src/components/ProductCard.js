@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ShoppingCart, Heart, TrendingUp } from 'lucide-react';
 import styles from './ProductCard.module.css';
 
-export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
+export const ProductCard = ({ product, onAddCart, onViewDetails, children }) => {
   const [isFavorited, setIsFavorited] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
 
@@ -108,7 +108,7 @@ export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
             animate={{ scale: 1 }}
             transition={{ delay: 0.2 }}
           >
-            ₹{product.current_price ? Number(product.current_price).toFixed(2) : (product.price ? Number(product.price).toFixed(2) : '0.00')}
+            ₹{product.current_price ? Number(product.current_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (product.price ? Number(product.price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00')}
           </motion.div>
           {product.originalPrice && (
             <motion.span
@@ -149,12 +149,13 @@ export const ProductCard = ({ product, onAddCart, onViewDetails }) => {
             className={styles.cartBtn}
             whileHover={{ scale: 1.05, backgroundColor: '#1976D2' }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => onAddCart(product)}
+            onClick={() => onAddCart && onAddCart(product)}
           >
             <ShoppingCart size={18} />
             Add to Cart
           </motion.button>
         </motion.div>
+        {children}
       </div>
     </motion.div>
   );
