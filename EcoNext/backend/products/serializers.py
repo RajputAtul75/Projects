@@ -135,7 +135,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'user', 'status', 'total_price', 'shipping_address',
-            'city', 'state', 'zipcode', 'country', 'items', 'created_at'
+            'city', 'state', 'zipcode', 'country', 'payment_method', 'items', 'created_at'
         ]
 
 

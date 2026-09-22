@@ -15,6 +15,13 @@ class Order(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     
+    PAYMENT_CHOICES = [
+        ('cash', 'Cash'),
+        ('upi', 'UPI'),
+        ('net_banking', 'Net Banking'),
+    ]
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default='cash')
+    
     # Shipping details
     shipping_address = models.TextField()
     city = models.CharField(max_length=100)

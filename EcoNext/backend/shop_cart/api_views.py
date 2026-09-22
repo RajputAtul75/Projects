@@ -225,7 +225,7 @@ def clear_cart(request):
 
 # ============ Order Endpoints ============
 
-REQUIRED_SHIPPING_FIELDS = ('address', 'city', 'state', 'zipcode', 'country')
+REQUIRED_SHIPPING_FIELDS = ('address', 'city', 'state', 'zipcode', 'country', 'payment_method')
 
 
 @api_view(['POST'])
@@ -283,6 +283,7 @@ def create_order(request):
             state=values['state'],
             zipcode=values['zipcode'],
             country=values['country'],
+            payment_method=values.get('payment_method', 'cash'),
         )
 
         OrderItem.objects.bulk_create([

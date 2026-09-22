@@ -15,6 +15,7 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
     state: '',
     zipcode: '',
     country: '',
+    paymentMethod: 'cash',
   });
 
   const [errors, setErrors] = useState({});
@@ -59,6 +60,7 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
         state: formData.state,
         zipcode: formData.zipcode,
         country: formData.country,
+        payment_method: formData.paymentMethod || 'cash',
       };
 
       const response = await apiService.createOrder(shippingData, authToken);
@@ -72,7 +74,9 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
         setErrors({ submit: response.error || 'Failed to place order' });
       }
     } catch (error) {
-      setErrors({ submit: 'Failed to place order. Please try again.' });
+      console.error(error);
+      const errorMessage = error.data && error.data.message ? error.data.message : (error.message || 'Failed to place order. Please try again.');
+      setErrors({ submit: errorMessage });
     }
     setLoading(false);
   };
@@ -344,6 +348,54 @@ export const CheckoutPage = ({ cart, onBack, onOrderSuccess, authToken }) => {
                   }}
                 />
                 {errors.country && <small style={{ color: '#EF4444', marginTop: '0.25rem' }}>{errors.country}</small>}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem', marginTop: '1rem', borderTop: '1px solid #E5E7EB', paddingTop: '1.5rem' }}>
+              <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem', fontWeight: '600' }}>Payment Method</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', padding: '1rem', border: formData.paymentMethod === 'cash' ? '2px solid #10B981' : '1px solid #E5E7EB', borderRadius: '8px', background: formData.paymentMethod === 'cash' ? '#ECFDF5' : 'white', transition: 'all 0.2s' }}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="cash"
+                    checked={formData.paymentMethod === 'cash'}
+                    onChange={handleChange}
+                    style={{ cursor: 'pointer', width: '1.2rem', height: '1.2rem', accentColor: '#10B981' }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: formData.paymentMethod === 'cash' ? '600' : '500', color: '#1F2937' }}>Cash on Delivery</span>
+                    <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>Pay when your order arrives</span>
+                  </div>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', padding: '1rem', border: formData.paymentMethod === 'upi' ? '2px solid #10B981' : '1px solid #E5E7EB', borderRadius: '8px', background: formData.paymentMethod === 'upi' ? '#ECFDF5' : 'white', transition: 'all 0.2s' }}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="upi"
+                    checked={formData.paymentMethod === 'upi'}
+                    onChange={handleChange}
+                    style={{ cursor: 'pointer', width: '1.2rem', height: '1.2rem', accentColor: '#10B981' }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: formData.paymentMethod === 'upi' ? '600' : '500', color: '#1F2937' }}>UPI</span>
+                    <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>Google Pay, PhonePe, Paytm, etc.</span>
+                  </div>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', padding: '1rem', border: formData.paymentMethod === 'net_banking' ? '2px solid #10B981' : '1px solid #E5E7EB', borderRadius: '8px', background: formData.paymentMethod === 'net_banking' ? '#ECFDF5' : 'white', transition: 'all 0.2s' }}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="net_banking"
+                    checked={formData.paymentMethod === 'net_banking'}
+                    onChange={handleChange}
+                    style={{ cursor: 'pointer', width: '1.2rem', height: '1.2rem', accentColor: '#10B981' }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontWeight: formData.paymentMethod === 'net_banking' ? '600' : '500', color: '#1F2937' }}>Net Banking / Cards</span>
+                    <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>Pay via credit/debit card or net banking</span>
+                  </div>
+                </label>
               </div>
             </div>
 
